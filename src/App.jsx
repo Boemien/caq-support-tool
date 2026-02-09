@@ -14,63 +14,89 @@ import Timeline from './components/Timeline'
 import Checklist from './components/Checklist'
 import TimelineBuilder from './components/TimelineBuilder'
 
+const INITIAL_FORM_DATA = {
+    fileNumber: '',
+    category: 'MAJEUR Première demande (Finance à vérifier)',
+    isConforming: false,
+    dob: '',
+    country: '',
+    applicationType: 'Première demande',
+    studyLevel: 'Collégial',
+    passportStatus: 'valid',
+    startDate: '',
+    endDate: '',
+    financeMode: 'calculate',
+    availableFunds: 0,
+    financialProof: false,
+    formDeclaration: false,
+    admissionLetter: false,
+    transcripts: false,
+    explanationsStudy: false,
+    fullTimeJustification: false,
+    pastInsurances: [],
+    futureInsurances: [],
+    prevCAQStart: '',
+    prevCAQEnd: '',
+    prevStudyStart: '',
+    prevStudyEnd: '',
+    entryDate: '',
+    isNewProgram: false,
+    payerType: 'self',
+    supportForm: false,
+    guarantorFinanceProof: false,
+    bankStatements6Months: false,
+    selfFinanceProof: false,
+    birthCertificate: false,
+    parentsIdentity: false,
+    parentalAuthorityDeclaration: false,
+    custodyDeclaration: false,
+    citizenshipProof: false,
+    consentDeclaration: false,
+    soleCustodyProof: false,
+    nonAccompanyingParentIdentity: false,
+    accompanyingParentsStatus: false,
+    parentalAuthorityDelegation: false,
+    responsibleAdultIdentity: false,
+    residenceProof: false,
+    criminalRecordCheck: false,
+    minorSituation: 'both_parents',
+    emancipationJudgment: false,
+    passportSigned: false,
+};
+
 function App() {
     const [activeTab, setActiveTab] = useState('input')
-    const [formData, setFormData] = useState({
-        fileNumber: '',
-        category: 'MAJ 1 NC',
-        isConforming: false,
-        dob: '',
-        country: '',
-        applicationType: 'Première demande',
-        studyLevel: 'Collégial',
-        passportStatus: 'valid',
-        startDate: '',
-        endDate: '',
-        financeMode: 'calculate',
-        availableFunds: 0,
-        financialProof: false,
-        formDeclaration: false,
-        admissionLetter: false,
-        transcripts: false,
-        explanationsStudy: false,
-        fullTimeJustification: false,
-        pastInsurances: [],
-        futureInsurances: [],
-        prevCAQStart: '',
-        prevCAQEnd: '',
-        prevStudyStart: '',
-        prevStudyEnd: '',
-        entryDate: '',
-        isNewProgram: false,
-        payerType: 'self', // 'self' or 'guarantor'
-        supportForm: false,
-        guarantorFinanceProof: false,
-        bankStatements6Months: false,
-        selfFinanceProof: false,
-        // Minor-specific documents
-        birthCertificate: false,
-        parentsIdentity: false,
-        parentalAuthorityDeclaration: false,
-        custodyDeclaration: false,
-        citizenshipProof: false,
-        consentDeclaration: false,
-        soleCustodyProof: false,
-        nonAccompanyingParentIdentity: false,
-        accompanyingParentsStatus: false,
-        parentalAuthorityDelegation: false,
-        responsibleAdultIdentity: false,
-        residenceProof: false,
-        criminalRecordCheck: false,
-        minorSituation: 'both_parents', // 'both_parents', 'one_parent', 'unaccompanied', 'emancipated'
-        emancipationJudgment: false,
-        passportSigned: false,
+    const [formData, setFormData] = useState(() => {
+        const saved = localStorage.getItem('caq_form_data');
+        return saved ? JSON.parse(saved) : INITIAL_FORM_DATA;
     })
 
-    const [timelineEvents, setTimelineEvents] = useState([])
+    const [timelineEvents, setTimelineEvents] = useState(() => {
+        const saved = localStorage.getItem('caq_timeline_events');
+        return saved ? JSON.parse(saved) : [];
+    })
     const [reportSource, setReportSource] = useState('dossier') // 'dossier' or 'pathway'
 
     const analysis = useMemo(() => analyzeDossier(formData), [formData])
+
+    // Persistence
+    useEffect(() => {
+        localStorage.setItem('caq_form_data', JSON.stringify(formData));
+    }, [formData]);
+
+    useEffect(() => {
+        localStorage.setItem('caq_timeline_events', JSON.stringify(timelineEvents));
+    }, [timelineEvents]);
+
+    const handleReset = () => {
+        if (window.confirm('Êtes-vous sûr de vouloir réinitialiser toutes les données ? Cette action est irréversible.')) {
+            localStorage.removeItem('caq_form_data');
+            localStorage.removeItem('caq_timeline_events');
+            setFormData(INITIAL_FORM_DATA);
+            setTimelineEvents([]);
+            setActiveTab('input');
+        }
+    };
 
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target
@@ -173,9 +199,14 @@ function App() {
 
                             <section className="card form-card mode-header-dossier">
                                 <div className="card-header">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <User size={18} />
-                                        <h2>Saisie & Analyse Individuelle</h2>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <User size={18} />
+                                            <h2>Saisie & Analyse Individuelle</h2>
+                                        </div>
+                                        <button className="btn-small reset-btn" onClick={handleReset} title="Tout effacer">
+                                            <RotateCcw size={14} /> Réinitialiser
+                                        </button>
                                     </div>
                                 </div>
                                 <div className="form-group">
@@ -652,89 +683,101 @@ function App() {
                         </div>
                     </div>
                 ) : (
-                    <div className="analysis-layout fade-in">
-                        <div className="summary-banner" style={{ background: getRecommendationColor(analysis.recommendation) }}>
-                            <div className="rec-info">
-                                <span className="category-label">{analysis.category || 'Catégorie non spécifiée'}</span>
-                                <div className="caq-period">
-                                    CAQ du <strong>{analysis.caqStart ? format(analysis.caqStart, 'dd/MM/yyyy') : '??'}</strong> au <strong>{analysis.caqEnd ? format(analysis.caqEnd, 'dd/MM/yyyy') : '??'}</strong>
-                                </div>
-                            </div>
-                            <div className="rec-text">
-                                <span className="label">RECOMMANDATION ADMINISTRATIVE</span>
-                                <h3>{analysis.recommendation}</h3>
-                            </div>
-                            <div className="rec-stats">
-                                <div className="stat"><strong>{analysis.summary.blockingCount}</strong> Bloquants</div>
-                                <div className="stat"><strong>{analysis.summary.majorCount}</strong> Majeurs</div>
+                    activeTab === 'report' && (!formData.startDate && !formData.endDate && !formData.fileNumber && !analysis.controls.some(c => c.status === 'OK')) ? (
+                        <div className="empty-state-container fade-in">
+                            <div className="empty-state-card">
+                                <ClipboardCheck size={48} color="var(--primary)" opacity={0.5} />
+                                <h3>Aucune donnée à analyser</h3>
+                                <p>Veuillez d'abord remplir les informations de votre dossier dans l'onglet <strong>Analyse du Dossier</strong> pour générer votre rapport personnalisé.</p>
+                                <button className="btn-primary" onClick={() => setActiveTab('input')}>
+                                    Commencer l'Analyse
+                                </button>
                             </div>
                         </div>
+                    ) : (
+                        <div className="analysis-layout fade-in">
+                            <div className="summary-banner" style={{ background: getRecommendationColor(analysis.recommendation) }}>
+                                <div className="rec-info">
+                                    <span className="category-label">{analysis.category || 'Catégorie non spécifiée'}</span>
+                                    <div className="caq-period">
+                                        CAQ du <strong>{analysis.caqStart && analysis.caqStart.toString() !== 'Invalid Date' ? format(analysis.caqStart, 'dd/MM/yyyy') : '??'}</strong> au <strong>{analysis.caqEnd && analysis.caqEnd.toString() !== 'Invalid Date' ? format(analysis.caqEnd, 'dd/MM/yyyy') : '??'}</strong>
+                                    </div>
+                                </div>
+                                <div className="rec-text">
+                                    <span className="label">RECOMMANDATION ADMINISTRATIVE</span>
+                                    <h3>{analysis.recommendation}</h3>
+                                </div>
+                                <div className="rec-stats">
+                                    <div className="stat"><strong>{analysis.summary.blockingCount}</strong> Bloquants</div>
+                                    <div className="stat"><strong>{analysis.summary.majorCount}</strong> Majeurs</div>
+                                </div>
+                            </div>
 
-                        <div className="analysis-grid">
-                            {reportSource === 'dossier' ? (
-                                <div className="column">
-                                    <section className="card res-card mode-header-dossier">
-                                        <h2 style={{ color: 'inherit' }}>Rapport d'Analyse Individuelle</h2>
-                                        <Timeline
-                                            startDate={formData.startDate}
-                                            endDate={formData.endDate}
-                                            caqStart={analysis.caqStart}
-                                            caqEnd={analysis.caqEnd}
-                                            entryDate={formData.entryDate}
-                                            isNewProgram={formData.isNewProgram}
-                                        />
-                                        {analysis.caqStart && (
-                                            <div className="date-hints">
-                                                <div className="hint">Prévoyance Installation : <strong>{format(analysis.caqStart, 'dd/MM/yyyy')}</strong></div>
-                                                <div className="hint">Marge Post-Études : <strong>{format(analysis.caqEnd, 'dd/MM/yyyy')}</strong></div>
+                            <div className="analysis-grid">
+                                {reportSource === 'dossier' ? (
+                                    <div className="column">
+                                        <section className="card res-card mode-header-dossier">
+                                            <h2 style={{ color: 'inherit' }}>Rapport d'Analyse Individuelle</h2>
+                                            <Timeline
+                                                startDate={formData.startDate}
+                                                endDate={formData.endDate}
+                                                caqStart={analysis.caqStart}
+                                                caqEnd={analysis.caqEnd}
+                                                entryDate={formData.entryDate}
+                                                isNewProgram={formData.isNewProgram}
+                                            />
+                                            {analysis.caqStart && (
+                                                <div className="date-hints">
+                                                    <div className="hint">Prévoyance Installation : <strong>{format(analysis.caqStart, 'dd/MM/yyyy')}</strong></div>
+                                                    <div className="hint">Marge Post-Études : <strong>{format(analysis.caqEnd, 'dd/MM/yyyy')}</strong></div>
+                                                </div>
+                                            )}
+                                        </section>
+
+                                        <section className="card res-card">
+                                            <h2>Résumé du Dossier</h2>
+                                            <div className="summary-list">
+                                                <div className="summary-item"><span>Dossier N°:</span> <strong>{formData.fileNumber || 'Non spécifié'}</strong></div>
+                                                <div className="summary-item"><span>Profil:</span> <strong>{analysis.summary.profile}</strong></div>
+                                                <div className="summary-item"><span>Niveau:</span> <strong>{analysis.summary.level}</strong></div>
+                                                <div className="summary-item"><span>Demande:</span> <strong>{analysis.summary.type}</strong></div>
+                                                <div className="summary-item"><span>Passeport:</span> <strong>{analysis.summary.passport}</strong></div>
                                             </div>
-                                        )}
-                                    </section>
+                                        </section>
+                                    </div>
+                                ) : (
+                                    <div className="column" style={{ gridColumn: '1 / -1' }}>
+                                        <section className="card res-card mode-header-pathway">
+                                            <h2 style={{ color: 'inherit' }}>Rapport de Reconstitution Chronologique (Parcours)</h2>
+                                            <Timeline
+                                                customEvents={timelineEvents}
+                                            />
+                                            <p className="hint">Étude indépendante du parcours et des délais.</p>
+                                        </section>
+                                    </div>
+                                )}
 
-                                    <section className="card res-card">
-                                        <h2>Résumé du Dossier</h2>
-                                        <div className="summary-list">
-                                            <div className="summary-item"><span>Dossier N°:</span> <strong>{formData.fileNumber || 'cxxx'}</strong></div>
-                                            <div className="summary-item"><span>Profil:</span> <strong>{analysis.summary.profile}</strong></div>
-                                            <div className="summary-item"><span>Niveau:</span> <strong>{analysis.summary.level}</strong></div>
-                                            <div className="summary-item"><span>Demande:</span> <strong>{analysis.summary.type}</strong></div>
-                                            <div className="summary-item"><span>Passeport:</span> <strong>{analysis.summary.passport}</strong></div>
-                                        </div>
-                                    </section>
-                                </div>
-                            ) : (
-                                <div className="column" style={{ gridColumn: '1 / -1' }}>
-                                    <section className="card res-card mode-header-pathway">
-                                        <h2 style={{ color: 'inherit' }}>Rapport de Reconstitution Chronologique (Parcours)</h2>
-                                        <Timeline
-                                            customEvents={timelineEvents}
-                                        />
-                                        <p className="hint">Étude indépendante du parcours et des délais.</p>
-                                    </section>
-                                </div>
-                            )}
+                                {reportSource === 'dossier' && (
+                                    <div className="column">
+                                        <section className="card res-card">
+                                            <h2>Checklist des Manquements</h2>
+                                            <Checklist controls={analysis.controls} />
+                                        </section>
+                                    </div>
+                                )}
+                            </div>
 
-                            {reportSource === 'dossier' && (
-                                <div className="column">
-                                    <section className="card res-card">
-                                        <h2>Checklist des Manquements</h2>
-                                        <Checklist controls={analysis.controls} />
-                                    </section>
-                                </div>
-                            )}
+                            <div className="analysis-actions no-print">
+                                <button className="btn-secondary" onClick={() => setActiveTab('input')}>
+                                    Modifier les données
+                                </button>
+                                <button className="btn-primary" onClick={() => window.print()}>
+                                    <ClipboardCheck size={18} /> Générer Rapport PDF
+                                </button>
+                            </div>
                         </div>
-
-                        <div className="analysis-actions no-print">
-                            <button className="btn-secondary" onClick={() => setActiveTab('input')}>
-                                Modifier les données
-                            </button>
-                            <button className="btn-primary" onClick={() => window.print()}>
-                                <ClipboardCheck size={18} /> Générer Rapport PDF
-                            </button>
-                        </div>
-                    </div>
-                )
-                }
+                    )
+                )}
             </main >
 
             <footer className="no-print">
@@ -993,6 +1036,14 @@ function App() {
           .segmented-control { flex-direction: column; }
           .segment { width: 100%; padding: 0.8rem; }
         }
+
+        .empty-state-container { display: flex; align-items: center; justify-content: center; min-height: 400px; padding: 2rem; }
+        .empty-state-card { background: white; padding: 3rem; border-radius: 24px; text-align: center; max-width: 500px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; align-items: center; gap: 1rem; border: 1px solid var(--accent); }
+        .empty-state-card h3 { margin: 0; color: var(--text); font-size: 1.5rem; }
+        .empty-state-card p { color: var(--text-muted); line-height: 1.6; margin-bottom: 1rem; }
+
+        .reset-btn { background: #fee2e2 !important; color: #dc2626 !important; border: 1px solid #fecaca !important; gap: 6px !important; }
+        .reset-btn:hover { background: #fecaca !important; }
 
         @media print {
           .no-print, header, nav, .action-footer, .nav-tabs, .btn-secondary, .btn-primary, .btn-small { display: none !important; }
