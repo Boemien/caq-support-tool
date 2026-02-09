@@ -36,12 +36,12 @@ export const FINANCIAL_THRESHOLDS = {
 };
 
 export const DOSSIER_CATEGORY = {
-    MAJ_1_NC: 'MAJ 1 NC',
-    MAJ_R_NC: 'MAJ R NC',
-    MAJ_1_C: 'MAJ 1 C',
-    MAJ_R_C: 'MAJ R C',
-    MIN_1_NC: 'MIN 1 NC',
-    MIN_R_NC: 'MIN R NC',
-    MIN_1_C: 'MIN 1 C',
-    MIN_R_C: 'MIN R C'
+    MAJ_1_NC: 'MAJEUR Première demande (Finance à vérifier)',
+    MAJ_R_NC: 'MAJEUR Renouvellement (Finance à vérifier)',
+    MAJ_1_C: 'MAJEUR Première demande (Exemption financière)',
+    MAJ_R_C: 'MAJEUR Renouvellement (Exemption financière)',
+    MIN_1_NC: 'MINEUR Première demande (Finance à vérifier)',
+    MIN_R_NC: 'MINEUR Renouvellement (Finance à vérifier)',
+    MIN_1_C: 'MINEUR Première demande (Exemption financière)',
+    MIN_R_C: 'MINEUR Renouvellement (Exemption financière)'
 };

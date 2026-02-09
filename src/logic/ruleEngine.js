@@ -42,13 +42,12 @@ export function analyzeDossier(data) {
         legalRef: 'Art. 13 RIQ'
     });
 
-    // Admission
     controls.push({
-        label: "Lettre d'admission / Attestation",
+        label: "Lettre d'admission ou Attestation",
         status: data.admissionLetter ? STATUS.OK : STATUS.MISSING,
         severity: SEVERITY.BLOCKING,
         legalRef: 'Art. 13 RIQ',
-        note: 'Doit inclure : programme, diplôme, dates, crédits/heures, frais de scolarité.'
+        note: 'Doit inclure : programme, diplôme, dates début/fin, nb crédits/heures, stage (< 50% durée), conditions admission, montant frais scolarité.'
     });
 
     // Renewal specific documents & Continuity
@@ -153,15 +152,26 @@ export function analyzeDossier(data) {
                 severity: SEVERITY.BLOCKING,
                 legalRef: 'Art. 13 RIQ'
             });
+            // According to Quebec.ca: Consent OR Proof of Sole Custody
             const hasConsent = data.consentDeclaration || data.soleCustodyProof;
             controls.push({
-                label: 'Consentement du parent non-accompagnant',
+                label: 'Consentement OU Preuve de garde exclusive',
                 status: hasConsent ? STATUS.OK : STATUS.MISSING,
                 severity: SEVERITY.BLOCKING,
                 legalRef: 'Art. 13 RIQ',
-                note: data.soleCustodyProof ? 'Justifié par preuve de garde exclusive.' : 'Situation B: Un seul parent accompagne.'
+                note: data.soleCustodyProof ? 'Justifié par preuve de garde exclusive.' : 'Situation B : Consentement requis si pas de garde exclusive.'
             });
         }
+
+        // Reminder for all signatures
+        controls.push({
+            label: 'Formulaires signés (Manuscrit/Numérisé)',
+            status: (data.formDeclaration && data.admissionLetter) ? STATUS.OK : STATUS.MISSING,
+            severity: SEVERITY.MINOR,
+            legalRef: 'GPI 3.5',
+            note: 'Les signatures dactylographiées ne sont pas acceptées. Signature manuscrite (stylet/souris) ou numérisée requise.'
+        });
+
 
         // Situation C: Unaccompanied
         if (data.minorSituation === 'unaccompanied') {
@@ -234,12 +244,14 @@ export function analyzeDossier(data) {
     if (!isUniversity) {
         if (isRenewal) {
             const hasPast = data.pastInsurances && data.pastInsurances.length > 0;
+            // Basic coverage check: sum of months should roughly match study duration
+            // This is a simplified check for the demonstration
             controls.push({
-                label: 'Assurances passées',
+                label: 'Assurances passées (Maintien de couverture)',
                 status: hasPast ? STATUS.OK : STATUS.MISSING,
                 severity: SEVERITY.MAJOR,
                 legalRef: 'Art. 15 RIQ',
-                note: !hasPast ? 'Requis pour Renouvellement Collégial/Professionnel.' : ''
+                note: !hasPast ? 'Requis pour Renouvellement : Prouver le maintien de l\'assurance pour toute la durée du séjour précédent.' : 'Périodes déclarées.'
             });
         }
 
@@ -280,7 +292,7 @@ export function analyzeDossier(data) {
             if (!data.selfFinanceProof) {
                 financeStatus = STATUS.MISSING;
                 financeNote = 'Candidat : Preuves financières récentes manquantes.';
-            } else if (isRenewal && !data.bankStatements6Months) {
+            } else if (!data.bankStatements6Months) {
                 financeStatus = STATUS.MISSING;
                 financeNote = 'Relevés bancaires des 6 derniers mois requis (doit montrer transactions, solde et propriété).';
             }

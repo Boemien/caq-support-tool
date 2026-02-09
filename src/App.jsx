@@ -83,8 +83,8 @@ function App() {
     const handleCategoryChange = (e) => {
         const cat = e.target.value;
         const isMinor = cat.startsWith('MIN');
-        const isRenewal = cat.includes(' R ');
-        const isConditional = cat.endsWith(' C');
+        const isRenewal = cat.includes('Renouvellement');
+        const isConditional = cat.includes('Exemption');
 
         setFormData(prev => ({
             ...prev,
@@ -178,14 +178,14 @@ function App() {
                                 <div className="form-group">
                                     <label>Catégorie de Dossier (GPI)</label>
                                     <select name="category" value={formData.category} onChange={handleCategoryChange} className="category-select">
-                                        <option value="MAJ 1 NC">MAJ 1 NC (Non Conditionnel - Finance à vérifier)</option>
-                                        <option value="MAJ R NC">MAJ R NC (Non Conditionnel - Finance à vérifier)</option>
-                                        <option value="MAJ 1 C">MAJ 1 C (Conditionnel - Exemption financière)</option>
-                                        <option value="MAJ R C">MAJ R C (Conditionnel - Exemption financière)</option>
-                                        <option value="MIN 1 NC">MIN 1 NC (Non Conditionnel - Finance à vérifier)</option>
-                                        <option value="MIN R NC">MIN R NC (Non Conditionnel - Finance à vérifier)</option>
-                                        <option value="MIN 1 C">MIN 1 C (Conditionnel - Exemption financière)</option>
-                                        <option value="MIN R C">MIN R C (Conditionnel - Exemption financière)</option>
+                                        <option value="MAJEUR Première demande (Finance à vérifier)">MAJEUR Première demande (Finance à vérifier)</option>
+                                        <option value="MAJEUR Renouvellement (Finance à vérifier)">MAJEUR Renouvellement (Finance à vérifier)</option>
+                                        <option value="MAJEUR Première demande (Exemption financière)">MAJEUR Première demande (Exemption financière)</option>
+                                        <option value="MAJEUR Renouvellement (Exemption financière)">MAJEUR Renouvellement (Exemption financière)</option>
+                                        <option value="MINEUR Première demande (Finance à vérifier)">MINEUR Première demande (Finance à vérifier)</option>
+                                        <option value="MINEUR Renouvellement (Finance à vérifier)">MINEUR Renouvellement (Finance à vérifier)</option>
+                                        <option value="MINEUR Première demande (Exemption financière)">MINEUR Première demande (Exemption financière)</option>
+                                        <option value="MINEUR Renouvellement (Exemption financière)">MINEUR Renouvellement (Exemption financière)</option>
                                     </select>
                                 </div>
                                 <div className="form-group">
@@ -350,13 +350,17 @@ function App() {
                                                 <label className="checkbox-item">
                                                     <input type="checkbox" name="selfFinanceProof" checked={formData.selfFinanceProof} onChange={handleInputChange} />
                                                     <span>Preuves récentes de capacité financière (Candidat)</span>
+                                                    <span className="tooltip-trigger" data-tooltip="Relevés, placements, bourses, etc.">
+                                                        <Info size={14} className="hint-icon" />
+                                                    </span>
                                                 </label>
-                                                {formData.applicationType === 'Renouvellement' && (
-                                                    <label className="checkbox-item">
-                                                        <input type="checkbox" name="bankStatements6Months" checked={formData.bankStatements6Months} onChange={handleInputChange} />
-                                                        <span>Relevés de banque des 6 derniers mois (≥ 6 mois au Qc)</span>
-                                                    </label>
-                                                )}
+                                                <label className="checkbox-item">
+                                                    <input type="checkbox" name="bankStatements6Months" checked={formData.bankStatements6Months} onChange={handleInputChange} />
+                                                    <span className="text-accent-bold">Relevés bancaires (6 derniers mois)</span>
+                                                    <span className="tooltip-trigger" data-tooltip="OBLIGATOIRE : Doit montrer l’historique des transactions, le solde et le nom du titulaire.">
+                                                        <Info size={14} className="hint-icon" />
+                                                    </span>
+                                                </label>
                                             </div>
                                         )}
 
@@ -547,9 +551,13 @@ function App() {
                                                     <input type="checkbox" name="consentDeclaration" checked={formData.consentDeclaration} onChange={handleInputChange} />
                                                     <span>Consentement écrit du parent non-accompagnant</span>
                                                 </label>
+                                                <div className="or-divider">OU</div>
                                                 <label className="checkbox-item">
                                                     <input type="checkbox" name="soleCustodyProof" checked={formData.soleCustodyProof} onChange={handleInputChange} />
-                                                    <span>Preuve de garde exclusive (si applicable)</span>
+                                                    <span>Preuve de garde exclusive</span>
+                                                    <span className="tooltip-trigger" data-tooltip="REMPLACE le consentement si le candidat est sous la garde exclusive d'un seul parent.">
+                                                        <Info size={14} className="hint-icon" />
+                                                    </span>
                                                 </label>
                                             </div>
                                         </div>
@@ -801,6 +809,51 @@ function App() {
         .category-select { width: 100%; padding: 0.85rem; border-radius: 12px; border: 2px solid var(--primary); background: #f0f7ff; font-weight: 800; color: var(--primary); margin-bottom: 1rem; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
         .category-select:hover { background: #e0eeff; }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .tooltip-trigger {
+            position: relative;
+            cursor: help;
+            display: inline-flex;
+            align-items: center;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        .tooltip-trigger:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 140%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2d3748;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            width: 220px;
+            z-index: 1000;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+            line-height: 1.4;
+            text-align: center;
+            pointer-events: none;
+            font-weight: 500;
+            animation: fadeInTooltip 0.2s ease-out;
+        }
+        .tooltip-trigger:hover::before {
+            content: '';
+            position: absolute;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #2d3748;
+            z-index: 1000;
+            pointer-events: none;
+            animation: fadeInTooltip 0.2s ease-out;
+        }
+        @keyframes fadeInTooltip {
+            from { opacity: 0; transform: translate(-50%, 5px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
         
         @media (max-width: 900px) {
           .input-layout, .analysis-grid { grid-template-columns: 1fr; }
