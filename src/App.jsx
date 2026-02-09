@@ -768,11 +768,24 @@ function App() {
             --pathway-primary: #6b46c1; /* Deep Purple */
             --pathway-secondary: #faf5ff;
         }
-        .nav-item { border-bottom: 3px solid transparent; border-radius: 0; padding: 1rem 1.5rem; height: 100%; display: flex; align-items: center; color: var(--text); background: transparent; transition: all 0.2s; font-weight: 600; }
-        .nav-item.active.mode-dossier { border-bottom-color: var(--primary); color: var(--primary); background: #f0f7ff; }
-        .nav-item.active.mode-pathway { border-bottom-color: var(--pathway-primary); color: var(--pathway-primary); background: var(--pathway-secondary); }
-        .nav-item.active.mode-report { border-bottom-color: #2d3748; color: #2d3748; background: #f7fafc; }
         .nav-item:hover:not(.active) { background: rgba(0,0,0,0.03); }
+        
+        @media (max-width: 768px) {
+            .nav-tabs { 
+                overflow-x: auto; 
+                display: flex; 
+                flex-wrap: nowrap; 
+                -webkit-overflow-scrolling: touch; 
+                scrollbar-width: none;
+            }
+            .nav-tabs::-webkit-scrollbar { display: none; }
+            .nav-item { 
+                flex: 0 0 auto; 
+                padding: 0.75rem 1rem; 
+                font-size: 0.9rem; 
+                white-space: nowrap;
+            }
+        }
         
         .input-layout, .analysis-grid, .chronology-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
         .form-column { display: flex; flex-direction: column; gap: 1.5rem; }
@@ -830,7 +843,7 @@ function App() {
         .insurance-row button:hover { background: #fff5f5; }
         
         .btn-small { background: var(--primary); color: white; border: none; padding: 0.4rem 1rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer; font-weight: 600; }
-        .category-select { width: 100%; padding: 0.85rem; border-radius: 12px; border: 2px solid var(--primary); background: #f0f7ff; font-weight: 800; color: var(--primary); margin-bottom: 1rem; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
+        .category-select { width: 100%; padding: 0.85rem; border-radius: 12px; border: 2px solid var(--primary); background: #f0f7ff; font-weight: 800; color: var(--primary); margin-bottom: 1rem; font-size: 1rem; cursor: pointer; transition: all 0.2s; white-space: normal; height: auto; line-height: 1.4; }
         .category-select:hover { background: #e0eeff; }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         
@@ -951,7 +964,34 @@ function App() {
         .by-brand strong { color: var(--primary); font-weight: 800; }
         
         @media (max-width: 900px) {
-          .input-layout, .analysis-grid { grid-template-columns: 1fr; }
+          .input-layout, .analysis-grid, .chronology-layout { grid-template-columns: 1fr; gap: 1.5rem; }
+          .form-row { grid-template-columns: 1fr; gap: 1rem; }
+          .summary-banner { flex-direction: column; text-align: center; gap: 1.5rem; padding: 1.5rem; }
+          .rec-stats { flex-wrap: wrap; justify-content: center; width: 100%; }
+          .stat { flex: 1; min-width: 120px; }
+          .card-header h2 { font-size: 1rem; }
+          .app-container { padding: 0.5rem; }
+        }
+
+        @media (max-width: 600px) {
+          header { flex-direction: column; gap: 1rem; align-items: flex-start; padding: 1rem; }
+          .brand-text h1 { font-size: 1.1rem; }
+          .by-brand { font-size: 0.7rem; }
+          .nav-tabs { width: 100%; border-top: 1px solid var(--border); }
+          .summary-banner h3 { font-size: 1.5rem; }
+          .summary-banner .category-label { font-size: 1rem; }
+          .footer-content { padding: 0 1rem; }
+          .source-links { gap: 0.75rem; }
+          .source-links a { width: 100%; text-align: center; }
+          .insurance-row { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+          .insurance-row span { text-align: center; }
+          .card { border-radius: 12px; padding: 1rem; }
+          .sub-section { padding-left: 1rem; margin-left: 0.5rem; }
+        }
+
+        @media screen and (max-width: 480px) {
+          .segmented-control { flex-direction: column; }
+          .segment { width: 100%; padding: 0.8rem; }
         }
 
         @media print {
