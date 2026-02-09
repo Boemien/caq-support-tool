@@ -1,11 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
     FileText, User, GraduationCap, Users, ShieldAlert,
     CheckCircle2, History, Timer, AlertTriangle, Info,
-    DollarSign, ClipboardCheck, ArrowRight
+    DollarSign, ClipboardCheck, ArrowRight, RotateCcw
 } from 'lucide-react'
 import { analyzeDossier } from './logic/ruleEngine'
-import { STATUS, SEVERITY, RECOMMENDATION } from './logic/constants'
+import { STATUS, SEVERITY, RECOMMENDATION, FINANCE_MIFI_COUNTRIES } from './logic/constants'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 
@@ -76,6 +76,7 @@ function App() {
         return saved ? JSON.parse(saved) : [];
     })
     const [reportSource, setReportSource] = useState('dossier') // 'dossier' or 'pathway'
+    const [showResetModal, setShowResetModal] = useState(false)
 
     const analysis = useMemo(() => analyzeDossier(formData), [formData])
 
@@ -89,21 +90,32 @@ function App() {
     }, [timelineEvents]);
 
     const handleReset = () => {
-        if (window.confirm('Êtes-vous sûr de vouloir réinitialiser toutes les données ? Cette action est irréversible.')) {
-            localStorage.removeItem('caq_form_data');
-            localStorage.removeItem('caq_timeline_events');
-            setFormData(INITIAL_FORM_DATA);
-            setTimelineEvents([]);
-            setActiveTab('input');
-        }
+        setShowResetModal(true);
+    };
+
+    const confirmReset = () => {
+        localStorage.removeItem('caq_form_data');
+        localStorage.removeItem('caq_timeline_events');
+        setFormData(INITIAL_FORM_DATA);
+        setTimelineEvents([]);
+        setActiveTab('input');
+        setShowResetModal(false);
     };
 
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'checkbox' ? checked : value
-        }))
+        const val = type === 'checkbox' ? checked : value
+
+        setFormData(prev => {
+            const next = { ...prev, [name]: val };
+
+            // Logic Coherence: If Primary study level, ensure category is MINEUR
+            if (name === 'studyLevel' && val === 'Primaire' && prev.category.startsWith('MAJ')) {
+                next.category = prev.category.replace('MAJEUR', 'MINEUR');
+            }
+
+            return next;
+        });
     }
 
     const handleCategoryChange = (e) => {
@@ -209,19 +221,42 @@ function App() {
                                         </button>
                                     </div>
                                 </div>
+                                <div className="form-group" style={{ borderBottom: '1px solid #edf2f7', paddingBottom: '1.5rem' }}>
+                                    <label className="text-accent-bold">1. Niveau d'études projeté</label>
+                                    <select name="studyLevel" value={formData.studyLevel} onChange={handleInputChange} className="category-select" style={{ borderColor: 'var(--accent)', borderWidth: '2px' }}>
+                                        <option value="Primaire">Primaire</option>
+                                        <option value="Professionnel">Professionnel</option>
+                                        <option value="Collégial">Collégial</option>
+                                        <option value="Universitaire">Universitaire</option>
+                                    </select>
+                                </div>
+
                                 <div className="form-group">
-                                    <label>Catégorie de Dossier (GPI)</label>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <label style={{ margin: 0 }}>2. Catégorie de Dossier (GPI)</label>
+                                        <span className="tooltip-trigger" data-tooltip="La mention 'Finance à vérifier' dépend du territoire de résidence (MIFI vs Fédéral). Les dossiers avec la mention 'Exemption financière' seront analysés par le Fédéral.">
+                                            <Info size={14} className="hint-icon" />
+                                        </span>
+                                    </div>
+
+
+
                                     <select name="category" value={formData.category} onChange={handleCategoryChange} className="category-select">
-                                        <option value="MAJEUR Première demande (Finance à vérifier)">MAJEUR Première demande (Finance à vérifier)</option>
-                                        <option value="MAJEUR Renouvellement (Finance à vérifier)">MAJEUR Renouvellement (Finance à vérifier)</option>
-                                        <option value="MAJEUR Première demande (Exemption financière)">MAJEUR Première demande (Exemption financière)</option>
-                                        <option value="MAJEUR Renouvellement (Exemption financière)">MAJEUR Renouvellement (Exemption financière)</option>
+                                        {formData.studyLevel !== 'Primaire' && (
+                                            <>
+                                                <option value="MAJEUR Première demande (Finance à vérifier)">MAJEUR Première demande (Finance à vérifier)</option>
+                                                <option value="MAJEUR Renouvellement (Finance à vérifier)">MAJEUR Renouvellement (Finance à vérifier)</option>
+                                                <option value="MAJEUR Première demande (Exemption financière)">MAJEUR Première demande (Exemption financière)</option>
+                                                <option value="MAJEUR Renouvellement (Exemption financière)">MAJEUR Renouvellement (Exemption financière)</option>
+                                            </>
+                                        )}
                                         <option value="MINEUR Première demande (Finance à vérifier)">MINEUR Première demande (Finance à vérifier)</option>
                                         <option value="MINEUR Renouvellement (Finance à vérifier)">MINEUR Renouvellement (Finance à vérifier)</option>
                                         <option value="MINEUR Première demande (Exemption financière)">MINEUR Première demande (Exemption financière)</option>
                                         <option value="MINEUR Renouvellement (Exemption financière)">MINEUR Renouvellement (Exemption financière)</option>
                                     </select>
                                 </div>
+
                                 <div className="form-group">
                                     <label>Numéro de dossier</label>
                                     <input name="fileNumber" value={formData.fileNumber} onChange={handleInputChange} placeholder="Ex: 1234567" />
@@ -241,16 +276,40 @@ function App() {
                                 </div>
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label>Niveau d'études</label>
-                                        <select name="studyLevel" value={formData.studyLevel} onChange={handleInputChange}>
-                                            <option value="Professionnel">Professionnel</option>
-                                            <option value="Collégial">Collégial</option>
-                                            <option value="Universitaire">Universitaire</option>
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Pays de résidence</label>
-                                        <input name="country" value={formData.country} onChange={handleInputChange} placeholder="Ex: Sénégal..." />
+                                        {formData.country && (
+                                            <div className="advice-box fade-in" style={{
+                                                background: '#f0fff4',
+                                                border: '1px solid #68d391',
+                                                color: '#22543d',
+                                                padding: '0.8rem',
+                                                borderRadius: '8px',
+                                                marginBottom: '0.8rem',
+                                                fontSize: '0.85rem'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                                    <Info size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+                                                    <div>
+                                                        {FINANCE_MIFI_COUNTRIES.some(c => c.toLowerCase() === formData.country.trim().toLowerCase()) ? (
+                                                            <strong>Conseil : Vous résidez dans un territoire qui necessite une vérification de vos preuves financières par le MIFI. Sélectionnez une catégorie "Finance à vérifier".</strong>
+                                                        ) : (
+                                                            <strong>Conseil : Vous résidez dans un territoire qui ne necessite pas une vérification de vos preuves financières par le MIFI mais vous devez fournir des preuves financières au fédéral. Sélectionnez une catégorie "Exemption financière".</strong>
+                                                        )}
+                                                        <div style={{ marginTop: '4px', opacity: 0.8 }}>
+                                                            En cas de doute, choisir "Finance à vérifier" permet une analyse complète de vos preuves financières.
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <label style={{ margin: 0 }}>Pays de résidence habituelle</label>
+                                        </div>
+                                        <input
+                                            name="country"
+                                            value={formData.country}
+                                            onChange={handleInputChange}
+                                            placeholder="Ex: France, Sénégal..."
+                                        />
                                     </div>
                                 </div>
                             </section>
@@ -346,9 +405,23 @@ function App() {
                         <div className="form-column">
                             <section className="card form-card">
                                 <div className="card-header">
-                                    <DollarSign size={18} />
-                                    <h2>Capacité Financière</h2>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <DollarSign size={18} />
+                                            <h2>Capacité Financière</h2>
+                                        </div>
+                                        <span className="tooltip-trigger territory-tooltip" data-tooltip="Territoires avec preuve Arrima (MIFI) : Autriche, Canada, États-Unis, France, Groenland, Hong Kong, Île de La Réunion, Monaco, Mexique, Saint-Pierre-et-Miquelon. Pour tout autre territoire, les preuves sont présentées au Bureau canadien des visas (IRCC).">
+                                            <Info size={18} className="hint-icon" />
+                                        </span>
+                                    </div>
                                 </div>
+
+                                {formData.country && !FINANCE_MIFI_COUNTRIES.some(c => c.toLowerCase() === formData.country.trim().toLowerCase()) && formData.country !== 'Autre territoire' && (
+                                    <div className="info-box-styled fade-in" style={{ marginBottom: '1.5rem', borderLeft: '4px solid #3182ce', background: '#ebf8ff', color: '#2c5282', padding: '1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Info size={20} />
+                                        <span><strong>Vérification Fédérale :</strong> Pour ce territoire, les preuves financières sont évaluées par IRCC selon les critères du Québec.</span>
+                                    </div>
+                                )}
 
                                 {formData.isConditional ? (
                                     <p className="info-box">Vérification financière non requise pour cette catégorie (Conditionnel).</p>
@@ -787,6 +860,7 @@ function App() {
                         <div className="source-links">
                             <a href="https://www.legisquebec.gouv.qc.ca/fr/document/lc/i-0.2.1" target="_blank" rel="noopener noreferrer">LIQ (Loi sur l'immigration au Québec)</a>
                             <a href="https://www.legisquebec.gouv.qc.ca/fr/document/rc/I-0.2.1,%20r.%203" target="_blank" rel="noopener noreferrer">RIQ (Règlement sur l'immigration au Québec)</a>
+                            <a href="https://www.quebec.ca/education/etudier-quebec/demande-selection-temporaire/capacite-financiere-documents-exiges" target="_blank" rel="noopener noreferrer">Capacité financière (Règle Territoires)</a>
                             <a href="https://www.quebec.ca/education/etudier-quebec" target="_blank" rel="noopener noreferrer">Étudier au Québec (Quebec.ca)</a>
                             <a href="https://www.quebec.ca/education/etudier-quebec/documents" target="_blank" rel="noopener noreferrer">Documents requis (Quebec.ca)</a>
                         </div>
@@ -1045,6 +1119,19 @@ function App() {
         .reset-btn { background: #fee2e2 !important; color: #dc2626 !important; border: 1px solid #fecaca !important; gap: 6px !important; }
         .reset-btn:hover { background: #fecaca !important; }
 
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 1rem; }
+        .modal-content { background: white; padding: 2.5rem; border-radius: 24px; max-width: 450px; width: 100%; box-shadow: var(--shadow-lg); border: 1px solid var(--accent); }
+        .modal-header-custom { display: flex; flex-direction: column; align-items: center; gap: 1rem; margin-bottom: 1.5rem; text-align: center; }
+        .modal-header-custom h3 { margin: 0; color: #1a202c; font-size: 1.25rem; font-weight: 800; }
+        .modal-content p { color: #4a5568; line-height: 1.6; text-align: center; margin-bottom: 2rem; font-size: 0.95rem; }
+        .modal-actions { display: flex; gap: 1rem; }
+        .modal-actions button { flex: 1; padding: 0.8rem; font-weight: 700; border-radius: 12px; }
+        .btn-danger { background: #dc2626 !important; color: white !important; border: none !important; }
+        .btn-danger:hover { background: #b91c1c !important; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3); }
+
+        @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .scale-in { animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+
         @media print {
           .no-print, header, nav, .action-footer, .nav-tabs, .btn-secondary, .btn-primary, .btn-small { display: none !important; }
           .app-container { padding: 0 !important; margin: 0 !important; box-shadow: none !important; width: 100% !important; background: white !important; }
@@ -1082,6 +1169,21 @@ function App() {
           }
         }
       `}</style>
+            {showResetModal && (
+                <div className="modal-overlay fade-in no-print">
+                    <div className="modal-content scale-in">
+                        <div className="modal-header-custom">
+                            <AlertTriangle size={48} color="#dc2626" />
+                            <h3>Réinitialiser les données ?</h3>
+                        </div>
+                        <p>Cette action effacera définitivement toutes les informations saisies dans l'analyse et la chronologie.</p>
+                        <div className="modal-actions">
+                            <button className="btn-secondary" onClick={() => setShowResetModal(false)}>Annuler</button>
+                            <button className="btn-primary btn-danger" onClick={confirmReset}>Confirmer l'effacement</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     )
 }

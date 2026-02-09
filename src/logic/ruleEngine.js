@@ -1,4 +1,4 @@
-import { STATUS, SEVERITY, RECOMMENDATION, FINANCIAL_THRESHOLDS, APPLICATION_TYPE, STUDY_LEVEL } from './constants.js';
+import { STATUS, SEVERITY, RECOMMENDATION, FINANCIAL_THRESHOLDS, APPLICATION_TYPE, STUDY_LEVEL, FINANCE_MIFI_COUNTRIES } from './constants.js';
 import { differenceInMonths, isBefore, addMonths, subMonths, differenceInYears } from 'date-fns';
 
 export function analyzeDossier(data) {
@@ -9,8 +9,25 @@ export function analyzeDossier(data) {
     const isAdult = isMinorCategory ? false : (age !== null ? age >= 17 : true);
     const isRenewal = data.applicationType === APPLICATION_TYPE.RENEWAL;
     const isUniversity = data.studyLevel === STUDY_LEVEL.UNIVERSITY;
+    const isPrimary = data.studyLevel === STUDY_LEVEL.PRIMAIRE;
+
+    // Country-based finance rule
+    const isMifiFinanceCountry = data.country && FINANCE_MIFI_COUNTRIES.some(c =>
+        c.toLowerCase() === data.country.trim().toLowerCase()
+    );
 
     // --- PIÈCES JUSTIFICATIVES ---
+
+    // Primary Exemption info
+    if (isPrimary) {
+        controls.push({
+            label: 'Exemption CAQ (Niveau Primaire)',
+            status: STATUS.OK,
+            severity: SEVERITY.MINOR,
+            legalRef: 'Art. 3 RIQ',
+            note: 'Note : Un enfant mineur qui est déjà au Québec et dont un parent est travailleur temporaire ou étudiant étranger n\'a pas besoin de CAQ pour le primaire/secondaire.'
+        });
+    }
 
     // Passport check
     let passportStatus = STATUS.OK;
@@ -44,10 +61,12 @@ export function analyzeDossier(data) {
 
     controls.push({
         label: "Lettre d'admission ou Attestation",
-        status: data.admissionLetter ? STATUS.OK : STATUS.MISSING,
+        status: data.admissionLetter ? STATUS.OK : (isPrimary || isMinorCategory ? STATUS.OK : STATUS.MISSING),
         severity: SEVERITY.BLOCKING,
         legalRef: 'Art. 13 RIQ',
-        note: 'Doit inclure : programme, diplôme, dates début/fin, nb crédits/heures, stage (< 50% durée), conditions admission, montant frais scolarité.'
+        note: (isPrimary || isMinorCategory)
+            ? 'Note : Pas requise pour les moins de 16 ans au primaire/secondaire si un parent a un statut. Sinon, à fournir.'
+            : 'Doit inclure : programme, diplôme, dates début/fin, nb crédits/heures, stage (< 50% durée), conditions admission, montant frais scolarité.'
     });
 
     // Renewal specific documents & Continuity
@@ -280,8 +299,20 @@ export function analyzeDossier(data) {
     if (data.isConditional) {
         financeStatus = STATUS.OK;
         financeNote = 'Dossier Conditionnel (Exemption financière)';
+    } else if (!isMifiFinanceCountry && data.country !== 'Autre territoire') {
+        // Territory where finance is verified at the Federal level (IRCC) instead of MIFI
+        financeStatus = STATUS.OK;
+        financeNote = 'Vérification au niveau Fédéral (IRCC) uniquement pour ce territoire.';
+
+        controls.push({
+            label: 'Capacité financière (IRCC)',
+            status: STATUS.OK,
+            severity: SEVERITY.MINOR,
+            legalRef: 'Lien MIFI-IRCC',
+            note: 'Pour ce territoire, le MIFI ne vérifie pas la capacité financière au stade du CAQ. Elle sera vérifiée par le Bureau canadien des visas (IRCC).'
+        });
     } else {
-        // Payer-specific checks
+        // Payer-specific checks for MIFI territories
         if (data.payerType === 'guarantor') {
             if (!data.supportForm || !data.guarantorFinanceProof) {
                 financeStatus = STATUS.MISSING;

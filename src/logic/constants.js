@@ -23,6 +23,7 @@ export const APPLICATION_TYPE = {
 };
 
 export const STUDY_LEVEL = {
+    PRIMAIRE: 'Primaire',
     PROFESSIONAL: 'Professionnel',
     COLLEGIAL: 'Collégial',
     UNIVERSITY: 'Universitaire'
@@ -45,3 +46,16 @@ export const DOSSIER_CATEGORY = {
     MIN_1_C: 'MINEUR Première demande (Exemption financière)',
     MIN_R_C: 'MINEUR Renouvellement (Exemption financière)'
 };
+
+export const FINANCE_MIFI_COUNTRIES = [
+    'Autriche',
+    'Canada',
+    'États-Unis',
+    'France',
+    'Groenland',
+    'Hong Kong',
+    'Île de La Réunion',
+    'Monaco',
+    'Mexique',
+    'Saint-Pierre-et-Miquelon'
+];
