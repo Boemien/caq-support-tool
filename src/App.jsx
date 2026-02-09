@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import {
     FileText, User, GraduationCap, Users, ShieldAlert,
     CheckCircle2, History, Timer, AlertTriangle, Info,
@@ -9,10 +9,14 @@ import { STATUS, SEVERITY, RECOMMENDATION, FINANCE_MIFI_COUNTRIES } from './logi
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 
+import { lazy, Suspense } from 'react'
+
 // Components
 import Timeline from './components/Timeline'
 import Checklist from './components/Checklist'
 import TimelineBuilder from './components/TimelineBuilder'
+
+const Timeline3D = lazy(() => import('./components/Timeline3D'))
 
 const INITIAL_FORM_DATA = {
     fileNumber: '',
@@ -64,6 +68,33 @@ const INITIAL_FORM_DATA = {
     passportSigned: false,
 };
 
+class ErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { hasError: false };
+    }
+    static getDerivedStateFromError(error) {
+        return { hasError: true };
+    }
+    componentDidCatch(error, errorInfo) {
+        console.error("3D Error caught:", error, errorInfo);
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div style={{ position: 'fixed', inset: 0, background: '#020617', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '2rem', textAlign: 'center' }}>
+                    <ShieldAlert size={48} color="#e53e3e" style={{ marginBottom: '1rem' }} />
+                    <h2>Oups ! La vue 3D n'a pas pu démarrer</h2>
+                    <p style={{ maxWidth: '400px', opacity: 0.8, margin: '1rem 0' }}>Votre navigateur ou votre carte graphique ne semble pas supporter les ressources nécessaires pour l'accélération 3D de ce module.</p>
+                    <button className="btn-primary" onClick={() => window.location.reload()}>Réessayer</button>
+                    <button className="btn-secondary" onClick={this.props.onBack} style={{ marginTop: '0.5rem', color: 'white', borderColor: 'white' }}>Retour au Dashboard</button>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
+
 function App() {
     const [activeTab, setActiveTab] = useState('input')
     const [formData, setFormData] = useState(() => {
@@ -77,6 +108,7 @@ function App() {
     })
     const [reportSource, setReportSource] = useState('dossier') // 'dossier' or 'pathway'
     const [showResetModal, setShowResetModal] = useState(false)
+    const [show3DTimeline, setShow3DTimeline] = useState(false)
 
     const analysis = useMemo(() => analyzeDossier(formData), [formData])
 
@@ -728,9 +760,18 @@ function App() {
                             </div>
                             <div className="column sticky">
                                 <section className="card res-card mode-header-pathway">
-                                    <div className="card-header">
-                                        <History size={18} />
-                                        <h2>Aperçu de la Chronologie</h2>
+                                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <History size={18} />
+                                            <h2 style={{ margin: 0 }}>Aperçu de la Chronologie</h2>
+                                        </div>
+                                        <button
+                                            className="btn-small"
+                                            onClick={() => setShow3DTimeline(true)}
+                                            style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '0.8rem', fontWeight: 600 }}
+                                        >
+                                            👁️ Visionner en 3D
+                                        </button>
                                     </div>
                                     <Timeline
                                         customEvents={timelineEvents}
@@ -810,7 +851,16 @@ function App() {
                                 ) : (
                                     <div className="column" style={{ gridColumn: '1 / -1' }}>
                                         <section className="card res-card mode-header-pathway">
-                                            <h2 style={{ color: 'inherit' }}>Rapport de Reconstitution Chronologique (Parcours)</h2>
+                                            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <h2 style={{ color: 'inherit', margin: 0 }}>Rapport de Reconstitution Chronologique (Parcours)</h2>
+                                                <button
+                                                    className="btn-small"
+                                                    onClick={() => setShow3DTimeline(true)}
+                                                    style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '0.8rem', fontWeight: 600 }}
+                                                >
+                                                    👁️ Visionner en 3D
+                                                </button>
+                                            </div>
                                             <Timeline
                                                 customEvents={timelineEvents}
                                             />
@@ -841,6 +891,17 @@ function App() {
                     )
                 )}
             </main >
+
+            {show3DTimeline && (
+                <ErrorBoundary onBack={() => setShow3DTimeline(false)}>
+                    <Suspense fallback={<div style={{ position: 'fixed', inset: 0, background: '#020617', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000 }}>Chargement de l'espace 3D...</div>}>
+                        <Timeline3D
+                            events={timelineEvents}
+                            onBack={() => setShow3DTimeline(false)}
+                        />
+                    </Suspense>
+                </ErrorBoundary>
+            )}
 
             <footer className="no-print">
                 <div className="container footer-content">
