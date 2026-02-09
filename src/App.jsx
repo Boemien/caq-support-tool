@@ -765,13 +765,22 @@ function App() {
                                             <History size={18} />
                                             <h2 style={{ margin: 0 }}>Aperçu de la Chronologie</h2>
                                         </div>
-                                        <button
-                                            className="btn-small"
-                                            onClick={() => setShow3DTimeline(true)}
-                                            style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '0.8rem', fontWeight: 600 }}
-                                        >
-                                            👁️ Visionner en 3D
-                                        </button>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <button
+                                                className="btn-secondary btn-small"
+                                                onClick={() => setShowResetModal(true)}
+                                                style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'red', fontSize: '0.75rem' }}
+                                            >
+                                                <RotateCcw size={14} /> Réinitialiser
+                                            </button>
+                                            <button
+                                                className="btn-small"
+                                                onClick={() => setShow3DTimeline(true)}
+                                                style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '0.8rem', fontWeight: 600 }}
+                                            >
+                                                👁️ Visionner en 3D
+                                            </button>
+                                        </div>
                                     </div>
                                     <Timeline
                                         customEvents={timelineEvents}
