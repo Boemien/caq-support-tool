@@ -139,7 +139,10 @@ function App() {
             <header>
                 <div className="brand">
                     <div className="logo-box"><FileText size={24} color="white" /></div>
-                    <h1>CAQ Support Tool <span className="version">v1.1</span></h1>
+                    <div className="brand-text">
+                        <h1>Outil d'accompagnement de demande de CAQ <span className="version">v1.1</span></h1>
+                        <div className="by-brand">par <a href="https://www.cvquebec.ca" target="_blank" rel="noopener noreferrer"><strong>CVQUEBEC</strong></a></div>
+                    </div>
                 </div>
                 <nav className="nav-tabs">
                     <button
@@ -734,6 +737,27 @@ function App() {
                 }
             </main >
 
+            <footer className="no-print">
+                <div className="container footer-content">
+                    <div className="footer-sources">
+                        <h4>Sources Officielles :</h4>
+                        <div className="source-links">
+                            <a href="https://www.legisquebec.gouv.qc.ca/fr/document/lc/i-0.2.1" target="_blank" rel="noopener noreferrer">LIQ (Loi sur l'immigration au Québec)</a>
+                            <a href="https://www.legisquebec.gouv.qc.ca/fr/document/rc/I-0.2.1,%20r.%203" target="_blank" rel="noopener noreferrer">RIQ (Règlement sur l'immigration au Québec)</a>
+                            <a href="https://www.quebec.ca/education/etudier-quebec" target="_blank" rel="noopener noreferrer">Étudier au Québec (Quebec.ca)</a>
+                            <a href="https://www.quebec.ca/education/etudier-quebec/documents" target="_blank" rel="noopener noreferrer">Documents requis (Quebec.ca)</a>
+                        </div>
+                    </div>
+                    <div className="footer-disclaimer">
+                        <AlertTriangle size={14} />
+                        <p><strong>Aide à la décision :</strong> Cet outil est une simulation basée sur les règles publiques. Il ne remplace pas les conseils d'un professionnel agréé et n'a aucune valeur juridique officielle.</p>
+                    </div>
+                    <div className="footer-copyright">
+                        <p>&copy; {new Date().getFullYear()} <a href="https://www.cvquebec.ca" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>www.cvquebec.ca</a> - Tous droits réservés.</p>
+                    </div>
+                </div>
+            </footer>
+
             <style>{`
         .mode-header-dossier .card-header { color: var(--primary); border-bottom-color: var(--accent); }
         .mode-header-pathway .card-header { color: var(--pathway-primary); border-bottom-color: #e9d8fd; }
@@ -854,6 +878,77 @@ function App() {
             from { opacity: 0; transform: translate(-50%, 5px); }
             to { opacity: 1; transform: translate(-50%, 0); }
         }
+
+        footer {
+            margin-top: 4rem;
+            padding: 3rem 0;
+            background: #f8fafc;
+            border-top: 1px solid var(--border);
+        }
+        .footer-content {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            align-items: center;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .footer-sources {
+            text-align: center;
+        }
+        .footer-sources h4 {
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .source-links {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .source-links a {
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            background: white;
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .source-links a:hover {
+            background: var(--accent);
+            transform: translateY(-2px);
+        }
+        .footer-disclaimer {
+            display: flex;
+            gap: 0.75rem;
+            background: #fff5f5;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            border: 1px solid #feb2b2;
+            max-width: 600px;
+            color: #c53030;
+            align-items: flex-start;
+        }
+        .footer-disclaimer p {
+            margin: 0;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+        .footer-copyright {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .brand-text { display: flex; flex-direction: column; gap: 0.1rem; }
+        .by-brand { font-size: 0.75rem; color: var(--text-muted); letter-spacing: 0.5px; margin-top: -2px; }
+        .by-brand strong { color: var(--primary); font-weight: 800; }
         
         @media (max-width: 900px) {
           .input-layout, .analysis-grid { grid-template-columns: 1fr; }
