@@ -209,6 +209,7 @@ function App() {
                     <div className="input-layout fade-in">
                         <div className="form-column">
 
+                            {/* 1. Saisie & Analyse Individuelle */}
                             <section className="card form-card mode-header-dossier">
                                 <div className="card-header">
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -238,8 +239,6 @@ function App() {
                                             <Info size={14} className="hint-icon" />
                                         </span>
                                     </div>
-
-
 
                                     <select name="category" value={formData.category} onChange={handleCategoryChange} className="category-select">
                                         {formData.studyLevel !== 'Primaire' && (
@@ -314,38 +313,7 @@ function App() {
                                 </div>
                             </section>
 
-                            <section className="card form-card">
-                                <div className="card-header">
-                                    <ShieldAlert size={18} />
-                                    <h2>Document de Voyage</h2>
-                                </div>
-                                <div className="form-group">
-                                    <label>État du Passeport</label>
-                                    <div className="segmented-control">
-                                        <label className={`segment ${formData.passportStatus === 'valid' ? 'active' : ''}`}>
-                                            <input type="radio" name="passportStatus" value="valid" checked={formData.passportStatus === 'valid'} onChange={handleInputChange} />
-                                            Présent & Valide
-                                        </label>
-                                        <label className={`segment ${formData.passportStatus === 'expired' ? 'active' : ''}`}>
-                                            <input type="radio" name="passportStatus" value="expired" checked={formData.passportStatus === 'expired'} onChange={handleInputChange} />
-                                            Présent & Non conforme
-                                        </label>
-                                        <label className={`segment ${formData.passportStatus === 'absent' ? 'active' : ''}`}>
-                                            <input type="radio" name="passportStatus" value="absent" checked={formData.passportStatus === 'absent'} onChange={handleInputChange} />
-                                            Absent
-                                        </label>
-                                    </div>
-                                </div>
-                                {formData.passportStatus === 'valid' && (
-                                    <div className="checklist-input fade-in" style={{ marginTop: '1rem' }}>
-                                        <label className="checkbox-item">
-                                            <input type="checkbox" name="passportSigned" checked={formData.passportSigned} onChange={handleInputChange} />
-                                            <span>Passeport signé par le titulaire (Art. 13 RIQ)</span>
-                                        </label>
-                                    </div>
-                                )}
-                            </section>
-
+                            {/* 2. Projet d'Études (DLI) */}
                             <section className="card form-card">
                                 <div className="card-header">
                                     <GraduationCap size={18} />
@@ -400,9 +368,49 @@ function App() {
                                     </div>
                                 )}
                             </section>
+
+                            {/* 3. Pièces Justificatives */}
+                            <section className="card form-card">
+                                <div className="card-header">
+                                    <ClipboardCheck size={18} />
+                                    <h2>Pièces Justificatives</h2>
+                                </div>
+                                <div className="checklist-input">
+                                    <label className="checkbox-item">
+                                        <input type="checkbox" name="formDeclaration" checked={formData.formDeclaration} onChange={handleInputChange} />
+                                        <span>Formulaires déclaration et engagement</span>
+                                    </label>
+                                    <label className="checkbox-item">
+                                        <input type="checkbox" name="admissionLetter" checked={formData.admissionLetter} onChange={handleInputChange} />
+                                        <span>Admission / Attestation fréquentation</span>
+                                    </label>
+
+                                    {formData.applicationType === 'Renouvellement' && (
+                                        <div className="sub-section fade-in">
+                                            <label className="checkbox-item">
+                                                <input type="checkbox" name="transcripts" checked={formData.transcripts} onChange={handleInputChange} />
+                                                <span>Relevés de notes officiels</span>
+                                            </label>
+                                            {!formData.transcripts && (
+                                                <label className="checkbox-item ml-4">
+                                                    <input type="checkbox" name="explanationsStudy" checked={formData.explanationsStudy} onChange={handleInputChange} />
+                                                    <span>Lettre explicative (si relevés absents)</span>
+                                                </label>
+                                            )}
+                                            {formData.explanationsStudy && (
+                                                <label className="checkbox-item ml-4">
+                                                    <input type="checkbox" name="fullTimeJustification" checked={formData.fullTimeJustification} onChange={handleInputChange} />
+                                                    <span>Justification Études Temps Plein</span>
+                                                </label>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </section>
                         </div>
 
                         <div className="form-column">
+                            {/* 4. Capacité Financière */}
                             <section className="card form-card">
                                 <div className="card-header">
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -502,44 +510,7 @@ function App() {
                                 )}
                             </section>
 
-                            <section className="card form-card">
-                                <div className="card-header">
-                                    <ClipboardCheck size={18} />
-                                    <h2>Pièces Justificatives</h2>
-                                </div>
-                                <div className="checklist-input">
-                                    <label className="checkbox-item">
-                                        <input type="checkbox" name="formDeclaration" checked={formData.formDeclaration} onChange={handleInputChange} />
-                                        <span>Formulaires déclaration et engagement</span>
-                                    </label>
-                                    <label className="checkbox-item">
-                                        <input type="checkbox" name="admissionLetter" checked={formData.admissionLetter} onChange={handleInputChange} />
-                                        <span>Admission / Attestation fréquentation</span>
-                                    </label>
-
-                                    {formData.applicationType === 'Renouvellement' && (
-                                        <div className="sub-section fade-in">
-                                            <label className="checkbox-item">
-                                                <input type="checkbox" name="transcripts" checked={formData.transcripts} onChange={handleInputChange} />
-                                                <span>Relevés de notes officiels</span>
-                                            </label>
-                                            {!formData.transcripts && (
-                                                <label className="checkbox-item ml-4">
-                                                    <input type="checkbox" name="explanationsStudy" checked={formData.explanationsStudy} onChange={handleInputChange} />
-                                                    <span>Lettre explicative (si relevés absents)</span>
-                                                </label>
-                                            )}
-                                            {formData.explanationsStudy && (
-                                                <label className="checkbox-item ml-4">
-                                                    <input type="checkbox" name="fullTimeJustification" checked={formData.fullTimeJustification} onChange={handleInputChange} />
-                                                    <span>Justification Études Temps Plein</span>
-                                                </label>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </section>
-
+                            {/* 5. Assurances Santé */}
                             <section className="card form-card">
                                 <div className="card-header">
                                     <ShieldAlert size={18} />
@@ -586,6 +557,40 @@ function App() {
                                 )}
                             </section>
 
+                            {/* 6. Document de Voyage */}
+                            <section className="card form-card">
+                                <div className="card-header">
+                                    <ShieldAlert size={18} />
+                                    <h2>Document de Voyage</h2>
+                                </div>
+                                <div className="form-group">
+                                    <label>État du Passeport</label>
+                                    <div className="segmented-control">
+                                        <label className={`segment ${formData.passportStatus === 'valid' ? 'active' : ''}`}>
+                                            <input type="radio" name="passportStatus" value="valid" checked={formData.passportStatus === 'valid'} onChange={handleInputChange} />
+                                            Présent & Valide
+                                        </label>
+                                        <label className={`segment ${formData.passportStatus === 'expired' ? 'active' : ''}`}>
+                                            <input type="radio" name="passportStatus" value="expired" checked={formData.passportStatus === 'expired'} onChange={handleInputChange} />
+                                            Présent & Non conforme
+                                        </label>
+                                        <label className={`segment ${formData.passportStatus === 'absent' ? 'active' : ''}`}>
+                                            <input type="radio" name="passportStatus" value="absent" checked={formData.passportStatus === 'absent'} onChange={handleInputChange} />
+                                            Absent
+                                        </label>
+                                    </div>
+                                </div>
+                                {formData.passportStatus === 'valid' && (
+                                    <div className="checklist-input fade-in" style={{ marginTop: '1rem' }}>
+                                        <label className="checkbox-item">
+                                            <input type="checkbox" name="passportSigned" checked={formData.passportSigned} onChange={handleInputChange} />
+                                            <span>Passeport signé par le titulaire (Art. 13 RIQ)</span>
+                                        </label>
+                                    </div>
+                                )}
+                            </section>
+
+                            {/* 7. Documents pour Mineur */}
                             {!analysis.isAdult && (
                                 <section className="card form-card fade-in">
                                     <div className="card-header">
@@ -647,24 +652,16 @@ function App() {
                                         <div className="sub-section fade-in">
                                             <h3>Situation B: Accompagné par un seul parent</h3>
                                             <p className="info-box" style={{ marginBottom: '1rem' }}>
-                                                Enfant accompagné par un seul parent. Consentement du parent non-accompagnant requis.
+                                                Enfant accompagné par un seul parent. Preuve de garde exclusive OU consentement de l'autre parent requis.
                                             </p>
                                             <div className="checklist-input">
                                                 <label className="checkbox-item">
-                                                    <input type="checkbox" name="nonAccompanyingParentIdentity" checked={formData.nonAccompanyingParentIdentity} onChange={handleInputChange} />
-                                                    <span>Identité du parent non-accompagnant (Passeport/CNI)</span>
+                                                    <input type="checkbox" name="legalCustody" checked={formData.legalCustody} onChange={handleInputChange} />
+                                                    <span>Jugement de garde exclusive</span>
                                                 </label>
                                                 <label className="checkbox-item">
-                                                    <input type="checkbox" name="consentDeclaration" checked={formData.consentDeclaration} onChange={handleInputChange} />
-                                                    <span>Consentement écrit du parent non-accompagnant</span>
-                                                </label>
-                                                <div className="or-divider">OU</div>
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="soleCustodyProof" checked={formData.soleCustodyProof} onChange={handleInputChange} />
-                                                    <span>Preuve de garde exclusive</span>
-                                                    <span className="tooltip-trigger" data-tooltip="REMPLACE le consentement si le candidat est sous la garde exclusive d'un seul parent.">
-                                                        <Info size={14} className="hint-icon" />
-                                                    </span>
+                                                    <input type="checkbox" name="otherParentConsent" checked={formData.otherParentConsent} onChange={handleInputChange} />
+                                                    <span>Formulaire de consentement (signé par le parent absent)</span>
                                                 </label>
                                             </div>
                                         </div>
@@ -675,28 +672,20 @@ function App() {
                                         <div className="sub-section fade-in">
                                             <h3>Situation C: Non accompagné</h3>
                                             <p className="info-box" style={{ marginBottom: '1rem' }}>
-                                                Enfant non accompagné. Délégation parentale et supervision d'un adulte responsable au Québec requises.
+                                                Délégation de l'autorité parentale à un résident canadien requis.
                                             </p>
                                             <div className="checklist-input">
                                                 <label className="checkbox-item">
-                                                    <input type="checkbox" name="parentalAuthorityDelegation" checked={formData.parentalAuthorityDelegation} onChange={handleInputChange} />
-                                                    <span>Délégation formelle d'autorité parentale (chaque parent)</span>
+                                                    <input type="checkbox" name="delegationAuthority" checked={formData.delegationAuthority} onChange={handleInputChange} />
+                                                    <span>Déclaration de délégation de l'autorité parentale (signée parents)</span>
                                                 </label>
                                                 <label className="checkbox-item">
-                                                    <input type="checkbox" name="custodyDeclaration" checked={formData.custodyDeclaration} onChange={handleInputChange} />
-                                                    <span>Déclaration de prise en charge par un adulte au Québec</span>
+                                                    <input type="checkbox" name="custodianshipDeclaration" checked={formData.custodianshipDeclaration} onChange={handleInputChange} />
+                                                    <span>Déclaration du gardien au Canada (signée gardien)</span>
                                                 </label>
                                                 <label className="checkbox-item">
-                                                    <input type="checkbox" name="responsibleAdultIdentity" checked={formData.responsibleAdultIdentity} onChange={handleInputChange} />
-                                                    <span>Identité de l'adulte responsable (Passeport/CNI)</span>
-                                                </label>
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="citizenshipProof" checked={formData.citizenshipProof} onChange={handleInputChange} />
-                                                    <span>Statut du responsable (Citoyen canadien ou Résident permanent)</span>
-                                                </label>
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="residenceProof" checked={formData.residenceProof} onChange={handleInputChange} />
-                                                    <span>Preuve de résidence du responsable au Québec</span>
+                                                    <input type="checkbox" name="custodianDoc" checked={formData.custodianDoc} onChange={handleInputChange} />
+                                                    <span>Preuve de citoyenneté/résidence du gardien</span>
                                                 </label>
                                                 <label className="checkbox-item">
                                                     <input type="checkbox" name="criminalRecordCheck" checked={formData.criminalRecordCheck} onChange={handleInputChange} />
