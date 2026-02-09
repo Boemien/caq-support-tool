@@ -750,7 +750,7 @@ function App() {
                     </div>
                     <div className="footer-disclaimer">
                         <AlertTriangle size={14} />
-                        <p><strong>Aide à la décision :</strong> Cet outil est une simulation basée sur les règles publiques. Il ne remplace pas les conseils d'un professionnel agréé et n'a aucune valeur juridique officielle.</p>
+                        <p><strong>Aide à la constitution de dossier :</strong> Cet outil est une simulation basée sur les règles publiques. Il ne remplace pas les conseils d'un professionnel agréé, ni les décisions officielles du gouvernement du Québec en matière de délivrance de CAQ et n'a aucune valeur juridique officielle.</p>
                     </div>
                     <div className="footer-copyright">
                         <p>&copy; {new Date().getFullYear()} <a href="https://www.cvquebec.ca" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>www.cvquebec.ca</a> - Tous droits réservés.</p>
@@ -998,31 +998,35 @@ function App() {
           .no-print, header, nav, .action-footer, .nav-tabs, .btn-secondary, .btn-primary, .btn-small { display: none !important; }
           .app-container { padding: 0 !important; margin: 0 !important; box-shadow: none !important; width: 100% !important; background: white !important; }
           main { padding: 0 !important; margin: 0 !important; }
-          .card { border: 1px solid #eee !important; box-shadow: none !important; break-inside: avoid; margin-bottom: 2rem !important; }
-          .summary-banner { border-radius: 0 !important; box-shadow: none !important; border: 2px solid #ccc !important; color: black !important; padding: 1.5rem !important; margin-bottom: 2rem !important; }
-          .summary-banner h3, .summary-banner strong, .summary-banner span { color: black !important; }
-          .stat { border: 1px solid #eee !important; background: none !important; color: black !important; }
+          .card { border: 1px solid #eee !important; box-shadow: none !important; break-inside: avoid; margin-bottom: 1rem !important; padding: 1rem !important; }
+          .summary-banner { border-radius: 0 !important; box-shadow: none !important; border: 2px solid #ccc !important; color: black !important; padding: 1rem !important; margin-bottom: 1rem !important; }
+          .summary-banner h3 { font-size: 1.5rem !important; margin-bottom: 0.5rem !important; }
+          .summary-banner strong, .summary-banner span { color: black !important; }
+          .rec-stats { gap: 1rem !important; }
+          .stat { border: 1px solid #eee !important; background: none !important; color: black !important; padding: 0.5rem !important; min-width: 80px !important; }
+          .stat strong { font-size: 1.2rem !important; }
           .analysis-grid { display: block !important; }
-          .column { width: 100% !important; margin-bottom: 2rem !important; }
-          body { background: white !important; font-size: 10pt !important; }
-          .timeline-widget { min-width: 100% !important; overflow: visible !important; }
-          .timeline-track { border: 1px solid #ddd !important; }
-          .side-label { background: white !important; border: 1px solid #ccc !important; }
-          h2, h3 { color: #2c3e50 !important; }
-          .category-label { border: 1px solid #ccc !important; background: #f8fafc !important; }
+          .column { width: 100% !important; margin-bottom: 1rem !important; }
+          body { background: white !important; font-size: 9pt !important; line-height: 1.2 !important; }
+          .timeline-widget { min-width: 100% !important; overflow: visible !important; margin-top: 1rem !important; }
+          .timeline-track { border: 1px solid #ddd !important; height: 180px !important; }
+          .side-label { background: white !important; border: 1px solid #ccc !important; font-size: 0.7rem !important; }
+          h2, h3 { color: #2c3e50 !important; font-size: 1rem !important; margin-bottom: 0.5rem !important; }
+          .card-header { margin-bottom: 0.75rem !important; padding-bottom: 0.25rem !important; }
+          .category-label { border: 1px solid #ccc !important; background: #f8fafc !important; font-size: 0.9rem !important; padding: 0.2rem 0.6rem !important; }
           
           /* Force color printing */
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           
           .app-container::before {
-            content: "RAPPORT D'ANALYSE DÉCISIONNELLE - CAQ QUEBEC";
+            content: "RAPPORT D'ANALYSE DE DOSSIER CAQ - CVQUEBEC";
             display: block;
             text-align: center;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             font-weight: 800;
-            margin-bottom: 2rem;
-            border-bottom: 3px solid var(--primary);
-            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 0.5rem;
             color: #1a365d;
           }
         }
