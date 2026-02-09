@@ -4,7 +4,9 @@ import { differenceInMonths, isBefore, addMonths, subMonths, differenceInYears }
 export function analyzeDossier(data) {
     const controls = [];
     const isMinorCategory = data.category && data.category.startsWith('MIN');
-    const isAdult = isMinorCategory ? false : (data.dob ? differenceInYears(new Date(), new Date(data.dob)) >= 18 : true);
+    // Official Quebec rule: minors are 16 and under, 17+ follow major rules
+    const age = data.dob ? differenceInYears(new Date(), new Date(data.dob)) : null;
+    const isAdult = isMinorCategory ? false : (age !== null ? age >= 17 : true);
     const isRenewal = data.applicationType === APPLICATION_TYPE.RENEWAL;
     const isUniversity = data.studyLevel === STUDY_LEVEL.UNIVERSITY;
 
@@ -12,16 +14,24 @@ export function analyzeDossier(data) {
 
     // Passport check
     let passportStatus = STATUS.OK;
-    if (data.passportStatus === 'absent') passportStatus = STATUS.MISSING;
-    else if (data.passportStatus === 'expired') passportStatus = STATUS.EXPIRED;
+    let passportNote = '';
+    if (data.passportStatus === 'absent') {
+        passportStatus = STATUS.MISSING;
+        passportNote = 'Passeport absent.';
+    } else if (data.passportStatus === 'expired') {
+        passportStatus = STATUS.EXPIRED;
+        passportNote = 'Le passeport est expiré.';
+    } else if (isAdult && !data.passportSigned) {
+        passportStatus = STATUS.INCONSISTENT;
+        passportNote = 'Passeport non signé : fournir une autre pièce d\'identité officielle avec photo et signature.';
+    }
 
     controls.push({
         label: 'Passeport et signature conformes',
         status: passportStatus,
         severity: SEVERITY.BLOCKING,
         legalRef: 'Art. 13 RIQ',
-        note: passportStatus === STATUS.EXPIRED ? 'Le passeport est expiré.' :
-            passportStatus === STATUS.MISSING ? 'Passeport absent.' : ''
+        note: passportNote
     });
 
     // Forms
@@ -37,7 +47,8 @@ export function analyzeDossier(data) {
         label: "Lettre d'admission / Attestation",
         status: data.admissionLetter ? STATUS.OK : STATUS.MISSING,
         severity: SEVERITY.BLOCKING,
-        legalRef: 'Art. 13 RIQ'
+        legalRef: 'Art. 13 RIQ',
+        note: 'Doit inclure : programme, diplôme, dates, crédits/heures, frais de scolarité.'
     });
 
     // Renewal specific documents & Continuity
@@ -53,9 +64,11 @@ export function analyzeDossier(data) {
 
         if (data.explanationsStudy) {
             controls.push({
-                label: 'Justification temps plein',
+                label: 'Justification temps plein / Documents officiels',
                 status: data.fullTimeJustification ? STATUS.OK : STATUS.MISSING,
-                severity: SEVERITY.MINOR
+                severity: SEVERITY.MINOR,
+                legalRef: 'Art. 11 RIQ',
+                note: 'Sceau, signature registraire, timbres passeport ou certificat médical requis.'
             });
         }
 
@@ -105,7 +118,7 @@ export function analyzeDossier(data) {
     // Determine minor age category and situation
     const minorAge = isAdult ? null : (data.dob ? differenceInYears(new Date(), new Date(data.dob)) : null);
     const isEmancipated = data.minorSituation === 'emancipated' || minorAge === 17;
-    
+
     if (!isAdult && !isEmancipated) {
         // Common requirements for all minor situations (A, B, C)
         controls.push({
@@ -127,6 +140,7 @@ export function analyzeDossier(data) {
                 label: 'Durée du séjour des parents (Permis/Admission)',
                 status: data.accompanyingParentsStatus ? STATUS.OK : STATUS.MISSING,
                 severity: SEVERITY.MAJOR,
+                legalRef: 'Art. 13 RIQ',
                 note: 'Établit la validité du CAQ de l\'enfant. Situation A: Les deux parents accompagnent.'
             });
         }
@@ -167,36 +181,39 @@ export function analyzeDossier(data) {
             controls.push({
                 label: 'Statut du responsable (Citoyen/RP)',
                 status: data.citizenshipProof ? STATUS.OK : STATUS.MISSING,
-                severity: SEVERITY.MAJOR
+                severity: SEVERITY.MAJOR,
+                legalRef: 'Art. 14 RIQ'
             });
             controls.push({
                 label: 'Identité du responsable au Québec',
                 status: data.responsibleAdultIdentity ? STATUS.OK : STATUS.MISSING,
-                severity: SEVERITY.BLOCKING
+                severity: SEVERITY.BLOCKING,
+                legalRef: 'Art. 14 RIQ'
             });
             controls.push({
                 label: 'Preuve de résidence de l\'adulte responsable',
                 status: data.residenceProof ? STATUS.OK : STATUS.MISSING,
-                severity: SEVERITY.MAJOR
+                severity: SEVERITY.MAJOR,
+                legalRef: 'Art. 14 RIQ'
             });
             controls.push({
-                label: 'Absence d\'antécédents judiciaires (Tous adultes du foyer)',
+                label: 'Absence antécédents judiciaires (Tous adultes résidence)',
                 status: data.criminalRecordCheck ? STATUS.OK : STATUS.MISSING,
-                severity: SEVERITY.MAJOR,
-                note: 'Requis pour chaque adulte résidant avec l\'enfant.'
+                severity: SEVERITY.BLOCKING,
+                legalRef: 'Art. 14 RIQ',
+                note: 'Rapport de police requis pour chaque adulte du foyer.'
             });
         }
     }
-    
-    // Situation D: 17 years old or Emancipated (triggers major-student rules)
-    if (!isAdult && (minorAge === 17 || isEmancipated)) {
-        const hasEmancipationDoc = data.emancipationJudgment;
+
+    // Situation D: emancipated (handled in App.jsx but reinforced here)
+    if (data.minorSituation === 'emancipated') {
         controls.push({
-            label: 'Jugement d\'émancipation (si applicable)',
-            status: hasEmancipationDoc ? STATUS.OK : (isEmancipated ? STATUS.MISSING : STATUS.OK),
-            severity: SEVERITY.MAJOR,
+            label: "Jugement d'émancipation (si applicable)",
+            status: data.emancipationJudgment ? STATUS.OK : STATUS.MISSING,
+            severity: SEVERITY.BLOCKING,
             legalRef: 'Art. 13 RIQ',
-            note: 'Situation D: Mineur émancipé (17 ans ou plus) ou avec jugement. Règles adulte applicables.'
+            note: 'Requis pour les mineurs émancipés de 16 ans et moins.'
         });
     }
 
@@ -239,6 +256,7 @@ export function analyzeDossier(data) {
             label: 'Assurances (Universitaire)',
             status: STATUS.OK,
             severity: SEVERITY.MINOR,
+            legalRef: 'Art. 15 RIQ',
             note: 'Réputées incluses.'
         });
     }
@@ -263,12 +281,8 @@ export function analyzeDossier(data) {
                 financeStatus = STATUS.MISSING;
                 financeNote = 'Candidat : Preuves financières récentes manquantes.';
             } else if (isRenewal && !data.bankStatements6Months) {
-                // Technically the user said "if since > 6 months",
-                // but the checkbox usually implies that condition is met.
-                // We'll treat it as required for self-payer renewal if the box isn't checked
-                // and maybe add a note.
                 financeStatus = STATUS.MISSING;
-                financeNote = 'Renouvellement Auto-payeur : Relevés bancaires 6 mois requis (si > 6 mois au Qc).';
+                financeNote = 'Relevés bancaires des 6 derniers mois requis (doit montrer transactions, solde et propriété).';
             }
         }
 

@@ -64,6 +64,7 @@ function App() {
         criminalRecordCheck: false,
         minorSituation: 'both_parents', // 'both_parents', 'one_parent', 'unaccompanied', 'emancipated'
         emancipationJudgment: false,
+        passportSigned: false,
     })
 
     const [timelineEvents, setTimelineEvents] = useState([])
@@ -193,8 +194,8 @@ function App() {
                                 </div>
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label>Date de naissance (AAAA-MM-JJ)</label>
-                                        <input type="text" name="dob" value={formData.dob} onChange={handleInputChange} placeholder="1978-11-18" />
+                                        <label>Date de naissance</label>
+                                        <input type="date" name="dob" value={formData.dob} onChange={handleInputChange} />
                                         <span className="input-hint">{analysis.isAdult ? 'Candidat Majeur' : 'Candidat Mineur'}</span>
                                     </div>
                                     <div className="form-group">
@@ -242,6 +243,14 @@ function App() {
                                         </label>
                                     </div>
                                 </div>
+                                {formData.passportStatus === 'valid' && (
+                                    <div className="checklist-input fade-in" style={{ marginTop: '1rem' }}>
+                                        <label className="checkbox-item">
+                                            <input type="checkbox" name="passportSigned" checked={formData.passportSigned} onChange={handleInputChange} />
+                                            <span>Passeport signé par le titulaire (Art. 13 RIQ)</span>
+                                        </label>
+                                    </div>
+                                )}
                             </section>
 
                             <section className="card form-card">
@@ -251,12 +260,12 @@ function App() {
                                 </div>
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label>Début du programme (AAAA-MM-JJ)</label>
-                                        <input type="text" name="startDate" value={formData.startDate} onChange={handleInputChange} placeholder="2025-09-01" />
+                                        <label>Début du programme</label>
+                                        <input type="date" name="startDate" value={formData.startDate} onChange={handleInputChange} />
                                     </div>
                                     <div className="form-group">
-                                        <label>Fin du programme (AAAA-MM-JJ)</label>
-                                        <input type="text" name="endDate" value={formData.endDate} onChange={handleInputChange} placeholder="2028-05-30" />
+                                        <label>Fin du programme</label>
+                                        <input type="date" name="endDate" value={formData.endDate} onChange={handleInputChange} />
                                     </div>
                                 </div>
 
@@ -265,28 +274,28 @@ function App() {
                                         <h3>Dates du CAQ Précédent</h3>
                                         <div className="form-row">
                                             <div className="form-group">
-                                                <label>Début CAQ précédent (AAAA-MM-JJ)</label>
-                                                <input type="text" name="prevCAQStart" value={formData.prevCAQStart} onChange={handleInputChange} placeholder="YYYY-MM-DD" />
+                                                <label>Début CAQ précédent</label>
+                                                <input type="date" name="prevCAQStart" value={formData.prevCAQStart} onChange={handleInputChange} />
                                             </div>
                                             <div className="form-group">
-                                                <label>Fin CAQ précédent (AAAA-MM-JJ)</label>
-                                                <input type="text" name="prevCAQEnd" value={formData.prevCAQEnd} onChange={handleInputChange} placeholder="YYYY-MM-DD" />
-                                            </div>
-                                        </div>
-                                        <div className="form-row" style={{ marginTop: '0.5rem' }}>
-                                            <div className="form-group">
-                                                <label>Début études précédentes (AAAA-MM-JJ)</label>
-                                                <input type="text" name="prevStudyStart" value={formData.prevStudyStart} onChange={handleInputChange} placeholder="YYYY-MM-DD" />
-                                            </div>
-                                            <div className="form-group">
-                                                <label>Fin études précédentes (AAAA-MM-JJ)</label>
-                                                <input type="text" name="prevStudyEnd" value={formData.prevStudyEnd} onChange={handleInputChange} placeholder="YYYY-MM-DD" />
+                                                <label>Fin CAQ précédent</label>
+                                                <input type="date" name="prevCAQEnd" value={formData.prevCAQEnd} onChange={handleInputChange} />
                                             </div>
                                         </div>
                                         <div className="form-row" style={{ marginTop: '0.5rem' }}>
                                             <div className="form-group">
-                                                <label>Date de première entrée au pays (AAAA-MM-JJ)</label>
-                                                <input type="text" name="entryDate" value={formData.entryDate} onChange={handleInputChange} placeholder="YYYY-MM-DD" />
+                                                <label>Début études précédentes</label>
+                                                <input type="date" name="prevStudyStart" value={formData.prevStudyStart} onChange={handleInputChange} />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Fin études précédentes</label>
+                                                <input type="date" name="prevStudyEnd" value={formData.prevStudyEnd} onChange={handleInputChange} />
+                                            </div>
+                                        </div>
+                                        <div className="form-row" style={{ marginTop: '0.5rem' }}>
+                                            <div className="form-group">
+                                                <label>Date de première entrée au pays</label>
+                                                <input type="date" name="entryDate" value={formData.entryDate} onChange={handleInputChange} />
                                             </div>
                                             <div className="form-group">
                                                 <label className="checkbox-item" style={{ justifyContent: 'flex-start', height: '100%', marginTop: '1.5rem' }}>
@@ -428,20 +437,40 @@ function App() {
                                 {formData.studyLevel === 'Universitaire' ? (
                                     <p className="info-box">L'assurance est réputée incluse pour le niveau universitaire.</p>
                                 ) : (
-                                    <div className="insurance-manager">
-                                        <div className="manager-header">
-                                            <h3>Périodes de couverture</h3>
-                                            <button className="btn-small" onClick={() => addInsurance('future')}>+ Ajouter</button>
-                                        </div>
-                                        {formData.futureInsurances.map((ins, idx) => (
-                                            <div key={idx} className="insurance-row">
-                                                <input type="text" placeholder="AAAA-MM-JJ" value={ins.start} onChange={(e) => updateInsurance('future', idx, 'start', e.target.value)} />
-                                                <span>au</span>
-                                                <input type="text" placeholder="AAAA-MM-JJ" value={ins.end} onChange={(e) => updateInsurance('future', idx, 'end', e.target.value)} />
-                                                <button onClick={() => removeInsurance('future', idx)}>×</button>
+                                    <div className="insurance-sections" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                        {formData.applicationType === 'Renouvellement' && (
+                                            <div className="insurance-manager">
+                                                <div className="manager-header">
+                                                    <h3>Périodes passées (Dernière année)</h3>
+                                                    <button className="btn-small" onClick={() => addInsurance('past')}>+ Ajouter</button>
+                                                </div>
+                                                {formData.pastInsurances.map((ins, idx) => (
+                                                    <div key={idx} className="insurance-row">
+                                                        <input type="date" value={ins.start} onChange={(e) => updateInsurance('past', idx, 'start', e.target.value)} />
+                                                        <span>au</span>
+                                                        <input type="date" value={ins.end} onChange={(e) => updateInsurance('past', idx, 'end', e.target.value)} />
+                                                        <button onClick={() => removeInsurance('past', idx)}>×</button>
+                                                    </div>
+                                                ))}
+                                                {formData.pastInsurances.length === 0 && <p className="hint">Aucune période passée ajoutée.</p>}
                                             </div>
-                                        ))}
-                                        {formData.futureInsurances.length === 0 && <p className="hint">Aucune période ajoutée.</p>}
+                                        )}
+
+                                        <div className="insurance-manager">
+                                            <div className="manager-header">
+                                                <h3>Périodes futures (Prochaine année)</h3>
+                                                <button className="btn-small" onClick={() => addInsurance('future')}>+ Ajouter</button>
+                                            </div>
+                                            {formData.futureInsurances.map((ins, idx) => (
+                                                <div key={idx} className="insurance-row">
+                                                    <input type="date" value={ins.start} onChange={(e) => updateInsurance('future', idx, 'start', e.target.value)} />
+                                                    <span>au</span>
+                                                    <input type="date" value={ins.end} onChange={(e) => updateInsurance('future', idx, 'end', e.target.value)} />
+                                                    <button onClick={() => removeInsurance('future', idx)}>×</button>
+                                                </div>
+                                            ))}
+                                            {formData.futureInsurances.length === 0 && <p className="hint">Aucune période future ajoutée.</p>}
+                                        </div>
                                     </div>
                                 )}
                             </section>
@@ -452,13 +481,13 @@ function App() {
                                         <Users size={18} />
                                         <h2>Documents pour Mineur</h2>
                                     </div>
-                                    
+
                                     {/* Minor Situation Selector */}
                                     <div className="form-group">
                                         <label>Situation du Mineur</label>
-                                        <select 
-                                            name="minorSituation" 
-                                            value={formData.minorSituation} 
+                                        <select
+                                            name="minorSituation"
+                                            value={formData.minorSituation}
                                             onChange={handleInputChange}
                                             className="category-select"
                                         >
@@ -485,7 +514,7 @@ function App() {
                                             </div>
                                         </div>
                                     )}
-                                    
+
                                     {/* Situation A: Both Parents */}
                                     {formData.minorSituation === 'both_parents' && (
                                         <div className="sub-section fade-in">
@@ -501,7 +530,7 @@ function App() {
                                             </div>
                                         </div>
                                     )}
-                                    
+
                                     {/* Situation B: One Parent */}
                                     {formData.minorSituation === 'one_parent' && (
                                         <div className="sub-section fade-in">
@@ -525,7 +554,7 @@ function App() {
                                             </div>
                                         </div>
                                     )}
-                                    
+
                                     {/* Situation C: Unaccompanied */}
                                     {formData.minorSituation === 'unaccompanied' && (
                                         <div className="sub-section fade-in">
@@ -561,7 +590,7 @@ function App() {
                                             </div>
                                         </div>
                                     )}
-                                    
+
                                     {/* Situation D: Emancipated */}
                                     {formData.minorSituation === 'emancipated' && (
                                         <div className="sub-section fade-in">

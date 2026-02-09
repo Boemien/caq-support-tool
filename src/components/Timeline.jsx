@@ -27,7 +27,7 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
             // Find the min and max dates, then add 1-month buffer on each side
             const minTime = Math.min(...allDates.map(d => d.getTime()));
             const maxTime = Math.max(...allDates.map(d => d.getTime()));
-            
+
             minDate = subMonths(startOfMonth(new Date(minTime)), 1);
             maxDate = addMonths(endOfMonth(new Date(maxTime)), 1);
         } else {
@@ -121,13 +121,29 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
                                                         className="marker-label side-label"
                                                         style={alignmentStyles}
                                                     >
-                                                        {!hasDecision && <span className="pending-tag">Demande de </span>}
-                                                        {event.label || (
-                                                            event.type === 'ENTRY' ? 'Entrée au pays' :
-                                                                event.type === 'CAQ_REFUSAL' ? 'Refus CAQ' :
-                                                                    event.type === 'CAQ' && hasDecision ? 'CAQ Octroyé' :
-                                                                        event.type
-                                                        )}
+                                                        {(() => {
+                                                            const labels = {
+                                                                'CAQ': 'Demande de CAQ',
+                                                                'CAQ_REFUSAL': 'Refus de CAQ',
+                                                                'INTENT_REFUSAL': 'Intention de Refus',
+                                                                'DOCS_SENT': 'Envoi de Documents',
+                                                                'INTERVIEW': 'Convocation Entrevue',
+                                                                'ENTRY': 'Entrée au pays',
+                                                                'TRAVEL': 'Sortie / Retour',
+                                                                'WORK_PERMIT': 'Permis Travail/Études',
+                                                                'STUDIES': 'Début des Études',
+                                                                'INSURANCE': 'Assurance Maladie'
+                                                            };
+
+                                                            const typeLabel = labels[event.type] || event.type;
+                                                            const displayLabel = event.label || typeLabel;
+
+                                                            if (!hasDecision && event.type === 'CAQ') {
+                                                                return <><span className="pending-tag">Demande de </span>{displayLabel}</>;
+                                                            }
+
+                                                            return displayLabel;
+                                                        })()}
                                                     </span>
                                                 );
                                             })()}

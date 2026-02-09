@@ -81,7 +81,7 @@ const TimelineBuilder = ({ events, setEvents }) => {
                                 />
                             </div>
                             <div className="form-group">
-                                <label>Date Fin (Optionnel)</label>
+                                <label>Date Fin</label>
                                 <input
                                     type="date"
                                     value={newEvent.end || ''}

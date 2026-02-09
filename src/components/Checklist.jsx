@@ -1,6 +1,6 @@
 import React from 'react';
 import { STATUS, SEVERITY } from '../logic/constants';
-import { AlertTriangle, XCircle, Info, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, XCircle, Info, CheckCircle2, Scale } from 'lucide-react';
 
 const Checklist = ({ controls }) => {
     const missingItems = controls.filter(c => c.status !== STATUS.OK);
@@ -27,7 +27,12 @@ const Checklist = ({ controls }) => {
                         <div className="content">
                             <div className="label-row">
                                 <strong>{item.label}</strong>
-                                {item.legalRef && <span className="legal-tag">{item.legalRef}</span>}
+                                {item.legalRef && (
+                                    <span className="legal-tag">
+                                        <Scale size={10} style={{ marginRight: '4px' }} />
+                                        {item.legalRef}
+                                    </span>
+                                )}
                             </div>
                             <p>{item.note}</p>
                         </div>
@@ -56,13 +61,18 @@ const Checklist = ({ controls }) => {
         .content.mineur { border-left: 4px solid #3498db; background: #f5faff; }
         .label-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
         .legal-tag { 
-          font-size: 0.7rem; 
-          background: #eee; 
-          padding: 2px 6px; 
-          border-radius: 4px; 
-          color: #666; 
-          font-family: monospace;
-          font-weight: 500;
+          font-size: 0.65rem; 
+          background: rgba(10, 37, 64, 0.08); 
+          padding: 3px 8px; 
+          border-radius: 6px; 
+          color: #0c2540; 
+          font-family: 'Outfit', sans-serif;
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          border: 1px solid rgba(10, 37, 64, 0.1);
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
         }
         .content strong { font-size: 0.95rem; }
         .content p { font-size: 0.85rem; color: #666; }
