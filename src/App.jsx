@@ -277,6 +277,19 @@ function App() {
             <main>
                 {activeTab === 'input' ? (
                     <div className="input-layout fade-in">
+                        <div style={{ gridColumn: '1 / -1', marginBottom: '2rem', background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+                                <div style={{ background: 'rgb(235, 248, 255)', padding: '10px', borderRadius: '12px' }}>
+                                    <FileText size={24} color="#3182ce" />
+                                </div>
+                                <div>
+                                    <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#2d3748' }}>Analyse d'Admissibilit&eacute; CAQ</h2>
+                                    <p style={{ margin: '4px 0 0', color: '#718096', fontSize: '0.95rem' }}>
+                                        Simulateur professionnel pour &eacute;valuer la conformit&eacute; d'un dossier avant soumission au MIFI.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                         <div className="form-column">
 
                             {/* 1. Saisie & Analyse Individuelle */}
@@ -792,6 +805,19 @@ function App() {
                     </div>
                 ) : activeTab === 'chronology' ? (
                     <div className="tab-content fade-in">
+                        <div style={{ marginBottom: '2rem', background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+                                <div style={{ background: 'rgb(240, 255, 244)', padding: '10px', borderRadius: '12px' }}>
+                                    <History size={24} color="#38a169" />
+                                </div>
+                                <div>
+                                    <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#2d3748' }}>Reconstitution du Parcours Migratoire</h2>
+                                    <p style={{ margin: '4px 0 0', color: '#718096', fontSize: '0.95rem' }}>
+                                        Outil de chronologie interactive pour visualiser l'historique des statuts et d&eacute;tecter les ruptures de conformit&eacute;.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                         <div className="chronology-layout">
                             <div className="column">
                                 <TimelineBuilder events={timelineEvents} setEvents={setTimelineEvents} />
@@ -880,18 +906,46 @@ function App() {
                     </div>
                 ) : (
                     activeTab === 'analysis' && !hasStarted ? (
-                        <div className="empty-state-container fade-in">
-                            <div className="empty-state-card">
-                                <ClipboardCheck size={48} color="var(--primary)" opacity={0.5} />
-                                <h3>Aucune donnée à analyser</h3>
-                                <p>Veuillez d'abord remplir les informations de votre dossier dans l'onglet <strong>Analyse du Dossier</strong> pour générer votre rapport personnalisé.</p>
-                                <button className="btn-primary" onClick={() => setActiveTab('input')}>
-                                    Commencer l'Analyse
-                                </button>
+                        <>
+                            <div className="no-print" style={{ marginBottom: '2rem', background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+                                    <div style={{ background: 'rgb(255, 245, 245)', padding: '10px', borderRadius: '12px' }}>
+                                        <ShieldAlert size={24} color="#e53e3e" />
+                                    </div>
+                                    <div>
+                                        <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#2d3748' }}>Rapport de Diagnostic &amp; Risques</h2>
+                                        <p style={{ margin: '4px 0 0', color: '#718096', fontSize: '0.95rem' }}>
+                                            Synth&egrave;se d&eacute;taill&eacute;e des points de non-conformit&eacute; et recommandations correctives pour le candidat.
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                            <div className="empty-state-container fade-in">
+                                <div className="empty-state-card">
+                                    <ClipboardCheck size={48} color="var(--primary)" opacity={0.5} />
+                                    <h3>Aucune donn&eacute;e &agrave; analyser</h3>
+                                    <p>Veuillez d'abord remplir les informations de votre dossier dans l'onglet <strong>Analyse du Dossier</strong> pour g&eacute;n&eacute;rer votre rapport personnalis&eacute;.</p>
+                                    <button className="btn-primary" onClick={() => setActiveTab('input')}>
+                                        Commencer l'Analyse
+                                    </button>
+                                </div>
+                            </div>
+                        </>
                     ) : (
                         <div className="analysis-layout fade-in">
+                            <div className="no-print" style={{ gridColumn: '1 / -1', marginBottom: '2rem', background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+                                    <div style={{ background: 'rgb(255, 245, 245)', padding: '10px', borderRadius: '12px' }}>
+                                        <ShieldAlert size={24} color="#e53e3e" />
+                                    </div>
+                                    <div>
+                                        <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#2d3748' }}>Rapport de Diagnostic &amp; Risques</h2>
+                                        <p style={{ margin: '4px 0 0', color: '#718096', fontSize: '0.95rem' }}>
+                                            Synth&egrave;se d&eacute;taill&eacute;e des points de non-conformit&eacute; et recommandations correctives pour le candidat.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
                             
                             {reportSource === 'dossier' ? (
                                 <div className="summary-banner" style={{ background: getRecommendationColor(analysis.recommendation) }}>
@@ -1303,6 +1357,7 @@ function App() {
         
         @media (max-width: 900px) {
           .input-layout, .analysis-grid, .chronology-layout { grid-template-columns: 1fr; gap: 1.5rem; }
+          .chronology-layout .column.sticky { order: -1; }
           .form-row { grid-template-columns: 1fr; gap: 1rem; }
           .summary-banner { flex-direction: column; text-align: center; gap: 1.5rem; padding: 1.5rem; }
           .rec-stats { flex-wrap: wrap; justify-content: center; width: 100%; }
