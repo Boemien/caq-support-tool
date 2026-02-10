@@ -7,6 +7,7 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
     // Calculer la plage globale
     // Priorise les paramètres explicites (startDate/endDate), sinon utilise tous les événements disponibles
     let minDate, maxDate;
+    let isEmpty = false;
 
     if (startDate && endDate) {
         // Use explicitly provided dates
@@ -31,9 +32,10 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
             minDate = subMonths(startOfMonth(new Date(minTime)), 1);
             maxDate = addMonths(endOfMonth(new Date(maxTime)), 1);
         } else {
-            // Fallback: no dates provided, use current month ± 6 months
-            minDate = startOfMonth(new Date());
-            maxDate = addMonths(minDate, 12);
+            // Fallback: no dates provided
+            isEmpty = true;
+            minDate = new Date(); // Dummy dates
+            maxDate = new Date();
         }
     }
 
@@ -41,6 +43,25 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
 
     const getOffset = (date) => (differenceInDays(new Date(date), minDate) / totalDays) * 100;
     const getWidth = (s, e) => (differenceInDays(new Date(e), new Date(s)) / totalDays) * 100;
+
+    if (isEmpty) {
+        return (
+            <div className="timeline-widget empty-placeholder" style={{
+                height: '200px',
+                background: '#f8fafc',
+                border: '2px dashed #cbd5e1',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#94a3b8',
+                fontSize: '0.95rem',
+                fontStyle: 'italic'
+            }}>
+                Commencez à ajouter des événements pour visualiser la chronologie.
+            </div>
+        );
+    }
 
     return (
         <div className="timeline-widget">
@@ -123,22 +144,26 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
                                                     >
                                                         {(() => {
                                                             const labels = {
-                                                                'CAQ': 'Demande de CAQ',
+                                                                'CAQ': 'Certificat (CAQ)',
                                                                 'CAQ_REFUSAL': 'Refus de CAQ',
                                                                 'INTENT_REFUSAL': 'Intention de Refus',
                                                                 'DOCS_SENT': 'Envoi de Documents',
                                                                 'INTERVIEW': 'Convocation Entrevue',
                                                                 'ENTRY': 'Entrée au pays',
-                                                                'TRAVEL': 'Sortie / Retour',
+                                                                'EXIT': 'Sortie du territoire',
                                                                 'WORK_PERMIT': 'Permis Travail/Études',
                                                                 'STUDIES': 'Début des Études',
-                                                                'INSURANCE': 'Assurance Maladie'
+                                                                'INSURANCE': 'Assurance Maladie',
+                                                                'MEDICAL': 'Maladie / Congé Médical'
                                                             };
 
                                                             const typeLabel = labels[event.type] || event.type;
                                                             const displayLabel = event.label || typeLabel;
 
-                                                            if (!hasDecision && event.type === 'CAQ') {
+                                                            if (!hasDecision && ['CAQ', 'WORK_PERMIT'].includes(event.type)) {
+                                                                if (displayLabel.toLowerCase().startsWith('demande de')) {
+                                                                    return <span className="pending-tag">{displayLabel}</span>;
+                                                                }
                                                                 return <><span className="pending-tag">Demande de </span>{displayLabel}</>;
                                                             }
 
@@ -204,7 +229,8 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
                 .custom-marker.caq_refusal { background: #e53e3e; }
                 .custom-marker.intent_refusal { background: #e53e3e; }
                 .custom-marker.entry { background: #ed8936; }
-                .custom-marker.travel { background: #718096; border-style: dashed; }
+                .custom-marker.exit { background: #718096; border-style: dashed; }
+                .custom-marker.medical { background: #f687b3; border: 2px solid #d53f8c; }
                 .custom-marker.work_permit { background: #805ad5; }
                 .custom-marker.docs_sent { background: #d6bcfa; }
                 .custom-marker.pending { background: #94a3b8; }

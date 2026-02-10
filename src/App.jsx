@@ -111,6 +111,7 @@ function App() {
     const [reportSource, setReportSource] = useState('dossier') // 'dossier' or 'pathway'
     const [showResetModal, setShowResetModal] = useState(false)
     const [show3DTimeline, setShow3DTimeline] = useState(false)
+    const [hasStarted, setHasStarted] = useState(false)
 
     const analysis = useMemo(() => analyzeDossier(formData), [formData])
     const timelineAnalysis = useMemo(() => analyzeTimeline(timelineEvents), [timelineEvents])
@@ -118,10 +119,15 @@ function App() {
     // Persistence
     useEffect(() => {
         localStorage.setItem('caq_form_data', JSON.stringify(formData));
+        // Use JSON.stringify for deep comparison to avoid reference issues
+        if (JSON.stringify(formData) !== JSON.stringify(INITIAL_FORM_DATA)) {
+            setHasStarted(true);
+        }
     }, [formData]);
 
     useEffect(() => {
         localStorage.setItem('caq_timeline_events', JSON.stringify(timelineEvents));
+        if (timelineEvents.length > 0) setHasStarted(true);
     }, [timelineEvents]);
 
     const handleReset = () => {
@@ -135,6 +141,7 @@ function App() {
         setTimelineEvents([]);
         setActiveTab('input');
         setShowResetModal(false);
+        setHasStarted(false);
     };
 
     const handleInputChange = (e) => {
@@ -844,7 +851,7 @@ function App() {
                         </div>
                     </div>
                 ) : (
-                    activeTab === 'report' && (!formData.startDate && !formData.endDate && !formData.fileNumber && !analysis.controls.some(c => c.status === 'OK')) ? (
+                    activeTab === 'analysis' && !hasStarted ? (
                         <div className="empty-state-container fade-in">
                             <div className="empty-state-card">
                                 <ClipboardCheck size={48} color="var(--primary)" opacity={0.5} />

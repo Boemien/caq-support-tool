@@ -89,7 +89,8 @@ const Timeline3D = ({ events = [], onBack }) => {
             else if (['CAQ_REFUSAL', 'INTENT_REFUSAL'].includes(event.type)) color = 0xe53e3e; // Red
             else if (['INTERVIEW', 'DOCS_SENT', 'WORK_PERMIT'].includes(event.type)) color = 0x805ad5; // Purple
             else if (event.type === 'INSURANCE') color = 0x38a169; // Green
-            else if (['ENTRY', 'TRAVEL'].includes(event.type)) color = 0xed8936; // Orange
+            else if (['ENTRY', 'EXIT'].includes(event.type)) color = 0xed8936; // Orange
+            else if (event.type === 'MEDICAL') color = 0xf687b3; // Pink
             else if (event.type === 'STUDIES') color = 0x3182ce; // Blue
             else if (event.category === 'ADM') color = 0x805ad5; // Fallback Admin
             else if (event.category === 'USR') color = 0x3182ce; // Fallback User
@@ -288,13 +289,44 @@ const Timeline3D = ({ events = [], onBack }) => {
                                     marginBottom: '4px',
                                     color: label.event.type === 'CAQ' ? '#60a5fa' : '#93c5fd'
                                 }}>
-                                    {label.event.type}
+                                    {(() => {
+                                        const EVENT_LABELS = {
+                                            'CAQ': 'Certificat (CAQ)',
+                                            'CAQ_REFUSAL': 'Refus de CAQ',
+                                            'INTENT_REFUSAL': 'Intention de Refus',
+                                            'DOCS_SENT': 'Envoi de Documents',
+                                            'INTERVIEW': 'Convocation Entrevue',
+                                            'ENTRY': 'Entrée au pays',
+                                            'EXIT': 'Sortie du territoire',
+                                            'WORK_PERMIT': 'Permis Travail/Études',
+                                            'STUDIES': 'Début des Études',
+                                            'INSURANCE': 'Assurance Maladie',
+                                            'MEDICAL': 'Maladie / Congé Médical'
+                                        };
+
+                                        // Logic to distinguish Request vs Obtained
+                                        const hasDecision = !!label.event.start;
+                                        let text = EVENT_LABELS[label.event.type] || label.event.type;
+
+                                        if (!hasDecision && ['CAQ', 'WORK_PERMIT'].includes(label.event.type)) {
+                                            if (label.event.type === 'CAQ') text = "Demande de CAQ";
+                                            if (label.event.type === 'WORK_PERMIT') text = "Demande de Permis";
+                                        }
+
+                                        return text;
+                                    })()}
                                 </div>
                                 <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '4px' }}>
                                     {label.event.label}
                                 </div>
                                 <div style={{ fontSize: '11px', opacity: 0.7, fontWeight: 500 }}>
-                                    {format(new Date(label.event.submissionDate || label.event.start), 'dd MMMM yyyy', { locale: fr })}
+                                    {label.event.start && label.event.end ? (
+                                        <>
+                                            {format(new Date(label.event.start), 'dd MMM yyyy', { locale: fr })} - {format(new Date(label.event.end), 'dd MMM yyyy', { locale: fr })}
+                                        </>
+                                    ) : (
+                                        format(new Date(label.event.submissionDate || label.event.start), 'dd MMMM yyyy', { locale: fr })
+                                    )}
                                 </div>
                             </div>
                         </React.Fragment>

@@ -14,7 +14,8 @@ const EVENT_TYPES = [
     { value: 'STUDIES', label: '🎓 Études (Programme)', ref: 'Art. 11 RIQ', category: 'USR' },
     { value: 'INSURANCE', label: '🏥 Assurance Maladie', ref: 'Art. 15 RIQ', category: 'USR' },
     { value: 'ENTRY', label: '🛬 Entrée au pays', ref: 'Art. 13 RIQ', category: 'USR' },
-    { value: 'TRAVEL', label: '✈️ Sortie / Retour territoire', ref: '', category: 'USR' },
+    { value: 'EXIT', label: '🛫 Sortie du territoire', ref: '', category: 'USR' },
+    { value: 'MEDICAL', label: '💊 Maladie / Congé Médical', ref: '', category: 'USR' },
     { value: 'OTHER', label: '📅 Autre Événement', ref: '', category: 'USR' },
 ];
 
@@ -79,7 +80,7 @@ const TimelineBuilder = ({ events, setEvents }) => {
                             />
                         </div>
                     </div>
-                    {!['CAQ_REFUSAL', 'INTENT_REFUSAL', 'DOCS_SENT', 'INTERVIEW'].includes(newEvent.type) && (
+                    {!['CAQ_REFUSAL', 'INTENT_REFUSAL', 'DOCS_SENT', 'INTERVIEW', 'ENTRY', 'EXIT'].includes(newEvent.type) && (
                         <div className="form-row">
                             <div className="form-group">
                                 <label>Date Début / Réponse</label>
@@ -114,24 +115,41 @@ const TimelineBuilder = ({ events, setEvents }) => {
                             </span>
                         </div>
                     )}
-                    {newEvent.type === 'CAQ' && (
+                    {['ENTRY', 'EXIT'].includes(newEvent.type) && (
                         <div className="form-group fade-in">
-                            <label>Détails Spécifiques au CAQ</label>
+                            <label>
+                                {newEvent.type === 'ENTRY' ? "Date d'arrivée au Canada" : "Date de départ du Canada"}
+                            </label>
+                            <input
+                                type="date"
+                                value={newEvent.start || ''}
+                                onChange={(e) => setNewEvent({ ...newEvent, start: e.target.value })}
+                            />
+                            <span className="input-hint">
+                                Date unique du mouvement migratoire (tampon passeport).
+                            </span>
+                        </div>
+                    )}
+                    {['CAQ', 'STUDIES'].includes(newEvent.type) && (
+                        <div className="form-group fade-in">
+                            <label>Détails Spécifiques au Programme</label>
                             <div className="form-row">
                                 <input
                                     type="text"
-                                    placeholder="Programme associé (ex: AEC...)"
+                                    placeholder="Programme d'études (ex: AEC, DEP...)"
                                     value={newEvent.linkedProgram}
                                     onChange={(e) => setNewEvent({ ...newEvent, linkedProgram: e.target.value })}
                                 />
-                                <label className="checkbox-item mini">
-                                    <input
-                                        type="checkbox"
-                                        checked={newEvent.isOutsideCanada}
-                                        onChange={(e) => setNewEvent({ ...newEvent, isOutsideCanada: e.target.checked })}
-                                    />
-                                    <span>Demande Hors Canada</span>
-                                </label>
+                                {newEvent.type === 'CAQ' && (
+                                    <label className="checkbox-item mini">
+                                        <input
+                                            type="checkbox"
+                                            checked={newEvent.isOutsideCanada}
+                                            onChange={(e) => setNewEvent({ ...newEvent, isOutsideCanada: e.target.checked })}
+                                        />
+                                        <span>Demande Hors Canada</span>
+                                    </label>
+                                )}
                             </div>
                         </div>
                     )}
