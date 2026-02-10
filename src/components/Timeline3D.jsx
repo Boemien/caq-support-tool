@@ -82,8 +82,17 @@ const Timeline3D = ({ events = [], onBack }) => {
 
             // Outer Glow Sphere
             const glowGeo = new THREE.SphereGeometry(0.6, 16, 16);
-            const color = event.type === 'CAQ' ? 0x003399 :
-                (event.type === 'CAQ_REFUSAL' || event.type === 'INTENT_REFUSAL' ? 0xe53e3e : 0x3182ce);
+            // Color Logic based on Category/Type
+            let color = 0x718096; // Default Gray
+
+            if (event.type === 'CAQ') color = 0x003399; // Deep Blue
+            else if (['CAQ_REFUSAL', 'INTENT_REFUSAL'].includes(event.type)) color = 0xe53e3e; // Red
+            else if (['INTERVIEW', 'DOCS_SENT', 'WORK_PERMIT'].includes(event.type)) color = 0x805ad5; // Purple
+            else if (event.type === 'INSURANCE') color = 0x38a169; // Green
+            else if (['ENTRY', 'TRAVEL'].includes(event.type)) color = 0xed8936; // Orange
+            else if (event.type === 'STUDIES') color = 0x3182ce; // Blue
+            else if (event.category === 'ADM') color = 0x805ad5; // Fallback Admin
+            else if (event.category === 'USR') color = 0x3182ce; // Fallback User
 
             const glowMat = new THREE.MeshBasicMaterial({
                 color: color,

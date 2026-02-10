@@ -2,17 +2,20 @@ import React, { useState } from 'react';
 import { Plus, Trash2, Clock, Scale, History, GraduationCap } from 'lucide-react';
 
 const EVENT_TYPES = [
-    { value: 'CAQ', label: 'Certificat (CAQ)', ref: 'Art. 13 RIQ' },
-    { value: 'CAQ_REFUSAL', label: 'Refus de CAQ', ref: 'Art. 11/13 RIQ' },
-    { value: 'STUDIES', label: 'Études (Programme)', ref: 'Art. 11 RIQ' },
-    { value: 'INSURANCE', label: 'Assurance Maladie', ref: 'Art. 15 RIQ' },
-    { value: 'ENTRY', label: 'Entrée au pays', ref: 'Art. 13 RIQ' },
-    { value: 'INTENT_REFUSAL', label: 'Intention de Refus', ref: 'GPI 3.2' },
-    { value: 'DOCS_SENT', label: 'Envoi de Documents', ref: '' },
-    { value: 'WORK_PERMIT', label: 'Permis de Travail/Études', ref: '' },
-    { value: 'INTERVIEW', label: 'Convocation Entrevue', ref: '' },
-    { value: 'TRAVEL', label: 'Sortie / Retour territoire', ref: '' },
-    { value: 'OTHER', label: 'Autre Événement', ref: '' },
+    // ACTES ADMINISTRATIFS & DÉCISIONS
+    { value: 'CAQ_REFUSAL', label: '⛔ Refus de CAQ', ref: 'Art. 11/13 RIQ', category: 'ADM' },
+    { value: 'INTENT_REFUSAL', label: '⚠️ Intention de Refus', ref: 'GPI 3.2', category: 'ADM' },
+    { value: 'INTERVIEW', label: '🗣️ Convocation Entrevue', ref: '', category: 'ADM' },
+    { value: 'DOCS_SENT', label: '📤 Envoi de Documents', ref: '', category: 'ADM' },
+
+    // PARCOURS & VIE DU CANDIDAT
+    { value: 'CAQ', label: '📜 Certificat (CAQ)', ref: 'Art. 13 RIQ', category: 'USR' },
+    { value: 'WORK_PERMIT', label: '🪪 Permis de Travail/Études', ref: '', category: 'USR' },
+    { value: 'STUDIES', label: '🎓 Études (Programme)', ref: 'Art. 11 RIQ', category: 'USR' },
+    { value: 'INSURANCE', label: '🏥 Assurance Maladie', ref: 'Art. 15 RIQ', category: 'USR' },
+    { value: 'ENTRY', label: '🛬 Entrée au pays', ref: 'Art. 13 RIQ', category: 'USR' },
+    { value: 'TRAVEL', label: '✈️ Sortie / Retour territoire', ref: '', category: 'USR' },
+    { value: 'OTHER', label: '📅 Autre Événement', ref: '', category: 'USR' },
 ];
 
 const TimelineBuilder = ({ events, setEvents }) => {
@@ -33,7 +36,8 @@ const TimelineBuilder = ({ events, setEvents }) => {
         setEvents([...events, {
             ...newEvent,
             id: Date.now(),
-            legalRef: typeInfo.ref
+            legalRef: typeInfo.ref,
+            category: typeInfo.category // Save category for later use
         }]);
         setNewEvent({ type: 'CAQ', start: '', end: '', label: '', note: '', linkedProgram: '', isOutsideCanada: false, submissionDate: '' });
     };
@@ -57,7 +61,12 @@ const TimelineBuilder = ({ events, setEvents }) => {
                                 value={newEvent.type}
                                 onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value })}
                             >
-                                {EVENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                                <optgroup label="--- ACTES ADMINISTRATIFS & DÉCISIONS ---">
+                                    {EVENT_TYPES.filter(t => t.category === 'ADM').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                                </optgroup>
+                                <optgroup label="--- PARCOURS & VIE DU CANDIDAT ---">
+                                    {EVENT_TYPES.filter(t => t.category === 'USR').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                                </optgroup>
                             </select>
                         </div>
                         <div className="form-group">
@@ -157,6 +166,8 @@ const TimelineBuilder = ({ events, setEvents }) => {
                                         <strong>{EVENT_TYPES.find(t => t.value === event.type)?.label}</strong>
                                         {event.label && <span className="event-desc"> - {event.label}</span>}
                                         {event.legalRef && <span className="legal-badge"><Scale size={10} /> {event.legalRef}</span>}
+                                        {event.category === 'ADM' && <span className="category-badge adm">ADMINISTRATIF</span>}
+                                        {event.category === 'USR' && <span className="category-badge usr">CANDIDAT</span>}
                                     </div>
                                     <div className="event-dates">
                                         {event.submissionDate && <span className="sub-date">Demande : {event.submissionDate} ➜ </span>}
@@ -260,6 +271,25 @@ const TimelineBuilder = ({ events, setEvents }) => {
                 .delete { color: #e74c3c; opacity: 0.6; transition: opacity 0.2s; }
                 .delete:hover { opacity: 1; }
                 .empty-msg { text-align: center; color: #999; padding: 2rem; font-style: italic; }
+
+                .category-badge {
+                    font-size: 0.6rem;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    font-weight: 700;
+                    letter-spacing: 0.5px;
+                    margin-left: 6px;
+                }
+                .category-badge.adm {
+                    background: #fed7d7;
+                    color: #c53030;
+                    border: 1px solid #feb2b2;
+                }
+                .category-badge.usr {
+                    background: #c6f6d5;
+                    color: #2f855a;
+                    border: 1px solid #9ae6b4;
+                }
             `}</style>
         </div>
     );

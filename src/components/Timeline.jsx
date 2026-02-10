@@ -94,7 +94,7 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
                                     )}
                                     {!isMarkerOnly ? (
                                         <div
-                                            className={`timeline-bar custom-bar ${event.type.toLowerCase()}`}
+                                            className={`timeline-bar custom-bar ${event.type.toLowerCase()} ${event.category === 'ADM' ? 'adm-event' : 'usr-event'}`}
                                             style={{ left: `${getOffset(event.start)}%`, width: `${getWidth(event.start, event.end)}%` }}
                                         >
                                             <div className="bar-content">
@@ -226,6 +226,12 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
                 .dot.work { background: #805ad5; }
                 .dot.intent { background: #e53e3e; }
                 .dot.pending { background: #94a3b8; }
+
+                /* CATEGORY STYLING */
+                .custom-bar.adm-event { border: 2px solid #e53e3e !important; box-shadow: 0 0 0 1px white inset !important; }
+                .custom-bar.usr-event { border: 1px solid rgba(255,255,255,0.5); }
+                
+                .custom-marker.adm-event .marker-pin { border-color: #e53e3e; }
             `}</style>
         </div>
     );

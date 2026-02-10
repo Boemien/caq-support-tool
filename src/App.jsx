@@ -5,6 +5,7 @@ import {
     DollarSign, ClipboardCheck, ArrowRight, RotateCcw
 } from 'lucide-react'
 import { analyzeDossier } from './logic/ruleEngine'
+import { analyzeTimeline, TIMELINE_STATUS } from './logic/timelineRules'
 import { STATUS, SEVERITY, RECOMMENDATION, FINANCE_MIFI_COUNTRIES } from './logic/constants'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
@@ -66,6 +67,7 @@ const INITIAL_FORM_DATA = {
     minorSituation: 'both_parents',
     emancipationJudgment: false,
     passportSigned: false,
+    minorConsent: false,
 };
 
 class ErrorBoundary extends React.Component {
@@ -111,6 +113,7 @@ function App() {
     const [show3DTimeline, setShow3DTimeline] = useState(false)
 
     const analysis = useMemo(() => analyzeDossier(formData), [formData])
+    const timelineAnalysis = useMemo(() => analyzeTimeline(timelineEvents), [timelineEvents])
 
     // Persistence
     useEffect(() => {
@@ -785,6 +788,52 @@ function App() {
                                     <Timeline
                                         customEvents={timelineEvents}
                                     />
+
+                                    {/* GLOBAL COMPLIANCE REPORT */}
+                                    <div style={{ marginTop: '1.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
+                                        <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <ShieldAlert size={18} color={timelineAnalysis.globalStatus === 'Exemplaire' ? '#10b981' : timelineAnalysis.globalStatus === 'Conforme' ? '#3b82f6' : '#e53e3e'} />
+                                            Rapport de Conformité Chronologique
+                                        </h3>
+
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                                            <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                                <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>SCORE GLOBAL</div>
+                                                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: timelineAnalysis.score >= 80 ? '#10b981' : timelineAnalysis.score >= 50 ? '#f59e0b' : '#e53e3e' }}>
+                                                    {timelineAnalysis.score}/100
+                                                </div>
+                                                <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>{timelineAnalysis.globalStatus}</div>
+                                            </div>
+                                            <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                                <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>ALERTES</div>
+                                                <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>
+                                                    {timelineAnalysis.controls.length + timelineAnalysis.insuranceIssues.length}
+                                                </div>
+                                                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Points à vérifier</div>
+                                            </div>
+                                        </div>
+
+                                        {timelineAnalysis.controls.map((ctrl, i) => (
+                                            <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', fontSize: '0.9rem', color: '#e53e3e', background: '#fef2f2', padding: '8px', borderRadius: '6px' }}>
+                                                <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                                <span>{ctrl.message}</span>
+                                            </div>
+                                        ))}
+
+                                        {timelineAnalysis.insuranceIssues.map((issue, i) => (
+                                            <div key={`ins-${i}`} style={{ display: 'flex', gap: '8px', marginBottom: '8px', fontSize: '0.9rem', color: '#d97706', background: '#fffbeb', padding: '8px', borderRadius: '6px' }}>
+                                                <ShieldAlert size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                                <span>{issue.message}</span>
+                                            </div>
+                                        ))}
+
+                                        {timelineAnalysis.controls.length === 0 && timelineAnalysis.insuranceIssues.length === 0 && (
+                                            <div style={{ display: 'flex', gap: '8px', fontSize: '0.9rem', color: '#059669', background: '#ecfdf5', padding: '8px', borderRadius: '6px' }}>
+                                                <CheckCircle2 size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                                <span>Aucune anomalie chronologique majeure détectée.</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </section>
                             </div>
                         </div>
@@ -873,7 +922,65 @@ function App() {
                                             <Timeline
                                                 customEvents={timelineEvents}
                                             />
-                                            <p className="hint">Étude indépendante du parcours et des délais.</p>
+                                            <p className="hint" style={{ marginBottom: '1.5rem' }}>Analyse complète de la continuité, des délais et des statuts.</p>
+
+                                            {/* GLOBAL COMPLIANCE REPORT (DUPLICATED FOR REPORT VIEW) */}
+                                            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
+                                                <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <ShieldAlert size={18} color={timelineAnalysis.globalStatus === 'Exemplaire' ? '#10b981' : timelineAnalysis.globalStatus === 'Conforme' ? '#3b82f6' : '#e53e3e'} />
+                                                    Rapport de Conformité Chronologique
+                                                </h3>
+
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                                                    <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                                                        <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Score Global</div>
+                                                        <div style={{ fontSize: '2rem', fontWeight: 800, color: timelineAnalysis.score >= 80 ? '#10b981' : timelineAnalysis.score >= 50 ? '#f59e0b' : '#e53e3e', lineHeight: 1.2 }}>
+                                                            {timelineAnalysis.score}<span style={{ fontSize: '1rem', color: '#94a3b8' }}>/100</span>
+                                                        </div>
+                                                        <div style={{ fontSize: '0.9rem', fontWeight: 700, marginTop: '5px' }}>{timelineAnalysis.globalStatus}</div>
+                                                    </div>
+                                                    <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                                                        <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Anomalies</div>
+                                                        <div style={{ fontSize: '2rem', fontWeight: 800, lineHeight: 1.2 }}>
+                                                            {timelineAnalysis.controls.length + timelineAnalysis.insuranceIssues.length}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Points d'attention</div>
+                                                    </div>
+                                                    <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                                                        <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Statut CAQ</div>
+                                                        <div style={{ fontSize: '2rem', fontWeight: 800, lineHeight: 1.2 }}>
+                                                            {timelineEvents.filter(e => e.type === 'CAQ').length}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Délivrés</div>
+                                                    </div>
+                                                </div>
+
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                    {timelineAnalysis.controls.map((ctrl, i) => (
+                                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.95rem', color: '#b91c1c', background: '#fef2f2', padding: '12px', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                                                            <AlertTriangle size={20} style={{ flexShrink: 0 }} />
+                                                            <span style={{ fontWeight: 500 }}>{ctrl.message}</span>
+                                                        </div>
+                                                    ))}
+
+                                                    {timelineAnalysis.insuranceIssues.map((issue, i) => (
+                                                        <div key={`ins-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.95rem', color: '#c2410c', background: '#fff7ed', padding: '12px', borderRadius: '8px', border: '1px solid #fed7aa' }}>
+                                                            <ShieldAlert size={20} style={{ flexShrink: 0 }} />
+                                                            <span style={{ fontWeight: 500 }}>{issue.message}</span>
+                                                        </div>
+                                                    ))}
+
+                                                    {timelineAnalysis.controls.length === 0 && timelineAnalysis.insuranceIssues.length === 0 && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1rem', color: '#15803d', background: '#f0fdf4', padding: '16px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                                                            <CheckCircle2 size={24} style={{ flexShrink: 0 }} />
+                                                            <div>
+                                                                <strong style={{ display: 'block' }}>Parcours Conforme</strong>
+                                                                <span style={{ fontSize: '0.9rem', opacity: 0.9 }}>Aucune rupture de continuité ou manque d'assurance détecté dans l'historique fourni.</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </section>
                                     </div>
                                 )}
