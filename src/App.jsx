@@ -115,6 +115,20 @@ function App() {
 
     const analysis = useMemo(() => analyzeDossier(formData), [formData])
     const timelineAnalysis = useMemo(() => analyzeTimeline(timelineEvents), [timelineEvents])
+    const timelineRange = useMemo(() => {
+        if (!timelineEvents || timelineEvents.length === 0) return null;
+        const dates = timelineEvents
+            .map(event => new Date(event.submissionDate || event.start || event.end))
+            .filter(date => !Number.isNaN(date.getTime()));
+        if (dates.length === 0) return null;
+        let min = dates[0];
+        let max = dates[0];
+        dates.forEach(date => {
+            if (date < min) min = date;
+            if (date > max) max = date;
+        });
+        return { min, max };
+    }, [timelineEvents]);
 
     // Persistence
     useEffect(() => {
@@ -213,6 +227,20 @@ function App() {
             default: return '#718096';
         }
     }
+
+    const getTimelineStatusColor = (status) => {
+        const normalized = String(status || '').toLowerCase();
+        if (normalized.includes('exemplaire')) return '#16a34a';
+        if (normalized.includes('conforme')) return '#2563eb';
+        if (normalized.includes('risque')) return '#f59e0b';
+        if (normalized.includes('critique')) return '#dc2626';
+        if (normalized.includes('neutral')) return '#64748b';
+        return '#475569';
+    };
+
+    const timelineStatusLabel = timelineAnalysis?.isEmpty ? 'Aucune donnee' : (timelineAnalysis?.globalStatus || '-');
+    const timelineScore = timelineAnalysis?.isEmpty ? 0 : timelineAnalysis.score;
+    const timelineIssuesCount = (timelineAnalysis?.controls?.length || 0) + (timelineAnalysis?.insuranceIssues?.length || 0);
 
     return (
         <div className="app-container">
@@ -864,22 +892,42 @@ function App() {
                         </div>
                     ) : (
                         <div className="analysis-layout fade-in">
-                            <div className="summary-banner" style={{ background: getRecommendationColor(analysis.recommendation) }}>
-                                <div className="rec-info">
-                                    <span className="category-label">{analysis.category || 'Catégorie non spécifiée'}</span>
-                                    <div className="caq-period">
-                                        CAQ du <strong>{analysis.caqStart && analysis.caqStart.toString() !== 'Invalid Date' ? format(analysis.caqStart, 'dd/MM/yyyy') : '??'}</strong> au <strong>{analysis.caqEnd && analysis.caqEnd.toString() !== 'Invalid Date' ? format(analysis.caqEnd, 'dd/MM/yyyy') : '??'}</strong>
+                            
+                            {reportSource === 'dossier' ? (
+                                <div className="summary-banner" style={{ background: getRecommendationColor(analysis.recommendation) }}>
+                                    <div className="rec-info">
+                                        <span className="category-label">{analysis.category || 'Categorie non specifiee'}</span>
+                                        <div className="caq-period">
+                                            CAQ du <strong>{analysis.caqStart && analysis.caqStart.toString() !== 'Invalid Date' ? format(analysis.caqStart, 'dd/MM/yyyy') : '??'}</strong> au <strong>{analysis.caqEnd && analysis.caqEnd.toString() !== 'Invalid Date' ? format(analysis.caqEnd, 'dd/MM/yyyy') : '??'}</strong>
+                                        </div>
+                                    </div>
+                                    <div className="rec-text">
+                                        <span className="label">RECOMMANDATION ADMINISTRATIVE</span>
+                                        <h3>{analysis.recommendation}</h3>
+                                    </div>
+                                    <div className="rec-stats">
+                                        <div className="stat"><strong>{analysis.summary.blockingCount}</strong> Bloquants</div>
+                                        <div className="stat"><strong>{analysis.summary.majorCount}</strong> Majeurs</div>
                                     </div>
                                 </div>
-                                <div className="rec-text">
-                                    <span className="label">RECOMMANDATION ADMINISTRATIVE</span>
-                                    <h3>{analysis.recommendation}</h3>
+                            ) : (
+                                <div className="summary-banner" style={{ background: getTimelineStatusColor(timelineStatusLabel) }}>
+                                    <div className="rec-info">
+                                        <span className="category-label">Rapport de parcours</span>
+                                        <div className="caq-period">
+                                            Periode du <strong>{timelineRange?.min ? format(timelineRange.min, 'dd/MM/yyyy') : '??'}</strong> au <strong>{timelineRange?.max ? format(timelineRange.max, 'dd/MM/yyyy') : '??'}</strong>
+                                        </div>
+                                    </div>
+                                    <div className="rec-text">
+                                        <span className="label">STATUT CHRONOLOGIQUE</span>
+                                        <h3>{timelineStatusLabel}</h3>
+                                    </div>
+                                    <div className="rec-stats">
+                                        <div className="stat"><strong>{timelineScore}</strong> Score</div>
+                                        <div className="stat"><strong>{timelineIssuesCount}</strong> Anomalies</div>
+                                    </div>
                                 </div>
-                                <div className="rec-stats">
-                                    <div className="stat"><strong>{analysis.summary.blockingCount}</strong> Bloquants</div>
-                                    <div className="stat"><strong>{analysis.summary.majorCount}</strong> Majeurs</div>
-                                </div>
-                            </div>
+                            )}
 
                             <div className="analysis-grid">
                                 {reportSource === 'dossier' ? (
