@@ -55,6 +55,7 @@ const TimelineBuilder = ({ events, setEvents }) => {
                     <h2>Nouvel Événement Chronologique</h2>
                 </div>
                 <div className="builder-form">
+
                     <div className="form-row">
                         <div className="form-group">
                             <label>Type d'événement</label>
@@ -80,26 +81,7 @@ const TimelineBuilder = ({ events, setEvents }) => {
                             />
                         </div>
                     </div>
-                    {!['CAQ_REFUSAL', 'INTENT_REFUSAL', 'DOCS_SENT', 'INTERVIEW', 'ENTRY', 'EXIT'].includes(newEvent.type) && (
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label>Date Début / Réponse</label>
-                                <input
-                                    type="date"
-                                    value={newEvent.start || ''}
-                                    onChange={(e) => setNewEvent({ ...newEvent, start: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Date Fin</label>
-                                <input
-                                    type="date"
-                                    value={newEvent.end || ''}
-                                    onChange={(e) => setNewEvent({ ...newEvent, end: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                    )}
+
                     {['CAQ', 'WORK_PERMIT', 'CAQ_REFUSAL', 'INTENT_REFUSAL', 'DOCS_SENT', 'INTERVIEW'].includes(newEvent.type) && (
                         <div className="form-group fade-in highlight-group">
                             <label>
@@ -133,7 +115,7 @@ const TimelineBuilder = ({ events, setEvents }) => {
                         </div>
                     )}
                     {['CAQ', 'STUDIES'].includes(newEvent.type) && (
-                        <div className="form-group fade-in">
+                        <div className="form-group fade-in highlight-group-purple">
                             <label>Détails Spécifiques au Programme</label>
                             <div className="form-row">
                                 <input
@@ -155,7 +137,43 @@ const TimelineBuilder = ({ events, setEvents }) => {
                             </div>
                         </div>
                     )}
-                    <div className="form-group">
+
+                    {/* Guidance + Duration Fields - Before Notes */}
+                    {['CAQ', 'WORK_PERMIT'].includes(newEvent.type) && (
+                        <div className="guidance-block-compact fade-in">
+                            <strong>📋 Guide:</strong> <span className="guidance-inline">Si vous effectuez une demande, remplissez <strong>seulement</strong> la date de dépôt plus haut. Si vous avez reçu une décision, remplissez la date de début et de fin.</span>
+                        </div>
+                    )}
+
+                    {!['CAQ_REFUSAL', 'INTENT_REFUSAL', 'DOCS_SENT', 'INTERVIEW', 'ENTRY', 'EXIT'].includes(newEvent.type) && (
+                        <div className="highlight-group-success">
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Date Début / Réponse</label>
+                                    <input
+                                        type="date"
+                                        value={newEvent.start || ''}
+                                        onChange={(e) => setNewEvent({ ...newEvent, start: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Date Fin</label>
+                                    <input
+                                        type="date"
+                                        value={newEvent.end || ''}
+                                        onChange={(e) => setNewEvent({ ...newEvent, end: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            {['CAQ', 'WORK_PERMIT'].includes(newEvent.type) && (
+                                <span className="input-hint success">
+                                    ✅ Remplissez ces dates si vous avez <strong>obtenu</strong> le document (période de validité).
+                                </span>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="form-group highlight-group-gray">
                         <label>Notes / Observations</label>
                         <textarea
                             rows="2"
@@ -164,6 +182,7 @@ const TimelineBuilder = ({ events, setEvents }) => {
                             onChange={(e) => setNewEvent({ ...newEvent, note: e.target.value })}
                         ></textarea>
                     </div>
+
                     <button className="btn-primary btn-pathway" onClick={addEvent}>
                         <Plus size={16} /> Ajouter à la chronologie du parcours
                     </button>
