@@ -9,6 +9,9 @@ const EVENT_LABELS = {
     CAQ: 'Certificat (CAQ)',
     CAQ_REFUSAL: 'Refus de CAQ',
     INTENT_REFUSAL: 'Intention de refus',
+    INTENT_CANCEL: 'Intention d\'annulation',
+    CAQ_CANCEL: 'Annulation du CAQ',
+    FRAUD_REJECTION: 'Rejet pour faux et trompeur',
     DOCS_SENT: 'Envoi de documents',
     INTERVIEW: 'Convocation entrevue',
     ENTRY: "Entrée au pays",
@@ -24,7 +27,7 @@ const LANE_DEFS = [
         id: 'immigration',
         label: 'Immigration',
         color: '#2563eb',
-        types: ['CAQ', 'CAQ_REFUSAL', 'INTENT_REFUSAL', 'WORK_PERMIT']
+        types: ['CAQ', 'CAQ_REFUSAL', 'INTENT_REFUSAL', 'INTENT_CANCEL', 'CAQ_CANCEL', 'FRAUD_REJECTION', 'WORK_PERMIT']
     },
     {
         id: 'documents',
@@ -51,6 +54,17 @@ const LANE_DEFS = [
         types: []
     }
 ];
+
+// Color mapping for specific event types (overrides lane color)
+const EVENT_COLORS = {
+    'CAQ_REFUSAL': '#ef4444',        // Red - Refusal
+    'INTENT_REFUSAL': '#f97316',     // Orange - Intent to refuse
+    'INTENT_CANCEL': '#dc2626',      // Dark red - Intent to cancel
+    'CAQ_CANCEL': '#991b1b',         // Very dark red - Cancellation
+    'FRAUD_REJECTION': '#7c3aed',    // Purple - Fraud
+    'CAQ': '#10b981',                // Green - Approved CAQ
+    'WORK_PERMIT': '#3b82f6'         // Blue - Work permit
+};
 
 const toDate = value => {
     if (!value) return null;
@@ -398,7 +412,8 @@ const Timeline3D = ({ events = [], onBack }) => {
 
         items.forEach(item => {
             const laneIndex = LANE_DEFS.findIndex(lane => lane.id === item.lane.id);
-            const color = item.lane.color;
+            // Use event-specific color if available, otherwise use lane color
+            const color = EVENT_COLORS[item.event.type] || item.lane.color;
             const x = laneX(laneIndex);
             const z = dateToZ(item.anchorDate);
             const y = laneY(item);
@@ -471,6 +486,7 @@ const Timeline3D = ({ events = [], onBack }) => {
         const vector = new THREE.Vector3();
         const updateLabels = () => {
             const { width: currentWidth, height: currentHeight } = getSize();
+            const cameraPos = camera.position;
 
             const maxOrder = totalDays || 1;
             const projected = labelTargets.map(target => {
@@ -479,6 +495,8 @@ const Timeline3D = ({ events = [], onBack }) => {
                 const y = (-vector.y * 0.5 + 0.5) * currentHeight;
                 const visible = vector.z > -1 && vector.z < 1;
 
+                const distance = cameraPos.distanceTo(target.position);
+
                 return {
                     id: target.id,
                     x,
@@ -486,6 +504,7 @@ const Timeline3D = ({ events = [], onBack }) => {
                     visible,
                     item: target.item,
                     depth: target.position.z,
+                    distance,
                     order: maxOrder - (target.item.dayIndex ?? 0)
                 };
             });
@@ -730,6 +749,8 @@ const Timeline3D = ({ events = [], onBack }) => {
                         ? `${formatDate(item.startDate)} → ${formatDate(item.endDate)}`
                         : formatDate(item.anchorDate);
 
+                    const scale = Math.max(0.4, Math.min(1, 35 / (label.distance || 35)));
+
                     return (
                         <div
                             key={label.id}
@@ -737,65 +758,66 @@ const Timeline3D = ({ events = [], onBack }) => {
                                 position: 'absolute',
                                 left: label.x,
                                 top: label.y,
-                                transform: 'translate(18px, -50%)',
+                                transform: `translate(18px, -50%) scale(${scale})`,
+                                transformOrigin: 'left center',
                                 zIndex: 1500 + label.order,
-                                background: 'rgba(15, 23, 42, 0.92)',
-                                backdropFilter: 'blur(12px)',
-                                padding: '14px 16px',
-                                borderRadius: '16px',
-                                border: `1.5px solid ${item.lane.color}99`,
+                                background: 'rgba(15, 23, 42, 0.94)',
+                                backdropFilter: 'blur(8px)',
+                                padding: '10px 12px',
+                                borderRadius: '12px',
+                                border: `1px solid ${item.lane.color}88`,
                                 color: 'white',
-                                minWidth: '210px',
-                                maxWidth: '260px',
-                                boxShadow: '0 12px 28px -12px rgba(15, 23, 42, 0.7)',
-                                opacity: Math.max(0.25, 1 + label.depth / 120)
+                                minWidth: '180px',
+                                maxWidth: '220px',
+                                boxShadow: '0 8px 20px -8px rgba(15, 23, 42, 0.8)',
+                                opacity: Math.max(0.4, 1 + label.depth / 100)
                             }}
                         >
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                                 <span style={{
-                                    fontSize: '10px',
+                                    fontSize: '9px',
                                     textTransform: 'uppercase',
-                                    letterSpacing: '0.08em',
+                                    letterSpacing: '0.05em',
                                     fontWeight: 700,
                                     color: item.lane.color
                                 }}>
                                     {title}
                                 </span>
                                 <span style={{
-                                    fontSize: '10px',
-                                    padding: '2px 8px',
+                                    fontSize: '9px',
+                                    padding: '1px 6px',
                                     borderRadius: '999px',
-                                    background: `${item.lane.color}33`,
+                                    background: `${item.lane.color}22`,
                                     color: 'white',
-                                    fontWeight: 700
+                                    fontWeight: 600
                                 }}>
                                     {item.lane.label}
                                 </span>
                             </div>
 
-                            <div style={{ fontWeight: 700, fontSize: '14px', marginTop: '6px', marginBottom: '6px' }}>
+                            <div style={{ fontWeight: 600, fontSize: '12px', marginTop: '4px', marginBottom: '4px', lineHeight: '1.2' }}>
                                 {mainLabel}
                             </div>
 
                             {item.submissionDate && hasRange && (
-                                <div style={{ fontSize: '11px', opacity: 0.75, marginBottom: '4px' }}>
-                                    Soumission: {formatDate(item.submissionDate)}
+                                <div style={{ fontSize: '10px', opacity: 0.6, marginBottom: '2px' }}>
+                                    Dépôt: {formatDate(item.submissionDate)}
                                 </div>
                             )}
 
-                            <div style={{ fontSize: '11px', opacity: 0.8 }}>
-                                {hasRange ? 'Période:' : 'Date:'} {dateLine}
+                            <div style={{ fontSize: '10px', opacity: 0.75 }}>
+                                {hasRange ? '' : ''} {dateLine}
                             </div>
 
-                            <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                 {item.durationDays !== null && (
                                     <span
                                         style={{
-                                            fontSize: '10px',
-                                            padding: '3px 8px',
+                                            fontSize: '9px',
+                                            padding: '2px 6px',
                                             borderRadius: '999px',
-                                            background: `${item.lane.color}33`,
-                                            border: `1px solid ${item.lane.color}55`
+                                            background: `${item.lane.color}22`,
+                                            border: `1px solid ${item.lane.color}44`
                                         }}
                                     >
                                         Durée: {item.durationDays} j

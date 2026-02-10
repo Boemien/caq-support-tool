@@ -100,7 +100,7 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
                         {customEvents.map((event, idx) => {
                             const hasDecision = !!event.start;
                             const anchorDate = event.start || event.submissionDate;
-                            const isMarkerOnly = !event.end || ['ENTRY', 'CAQ_REFUSAL', 'INTENT_REFUSAL', 'INTERVIEW', 'DOCS_SENT', 'TRAVEL'].includes(event.type) || !hasDecision;
+                            const isMarkerOnly = !event.end || ['ENTRY', 'CAQ_REFUSAL', 'INTENT_REFUSAL', 'INTENT_CANCEL', 'CAQ_CANCEL', 'FRAUD_REJECTION', 'INTERVIEW', 'DOCS_SENT', 'TRAVEL'].includes(event.type) || !hasDecision;
 
                             return (
                                 <div key={event.id} className="timeline-track custom-track">
@@ -147,6 +147,9 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
                                                                 'CAQ': 'Certificat (CAQ)',
                                                                 'CAQ_REFUSAL': 'Refus de CAQ',
                                                                 'INTENT_REFUSAL': 'Intention de Refus',
+                                                                'INTENT_CANCEL': 'Intention d\'Annulation',
+                                                                'CAQ_CANCEL': 'Annulation du CAQ',
+                                                                'FRAUD_REJECTION': 'Rejet pour Faux et Trompeur',
                                                                 'DOCS_SENT': 'Envoi de Documents',
                                                                 'INTERVIEW': 'Convocation Entrevue',
                                                                 'ENTRY': 'Entrée au pays',
