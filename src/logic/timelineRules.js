@@ -103,28 +103,45 @@ export function analyzeTimeline(events) {
     if (refusals.length > 0) {
         refusals.forEach(refusal => {
             const rDate = new Date(refusal.submissionDate || refusal.start);
-            // Check if a NEW CAQ application exists AFTER this refusal
-            const hasNewApp = sortedEvents.some(e =>
-                e.type === 'CAQ' && // Assuming CAQ type can determine "Request" via visual logic, or we check if it starts after
-                new Date(e.submissionDate || e.start) > rDate
+
+            // Check if a NEW CAQ was APPROVED (has start/end dates) AFTER this refusal
+            const hasApprovedCAQ = sortedEvents.some(e =>
+                e.type === 'CAQ' &&
+                e.start && e.end && // Must have validity dates (approved)
+                new Date(e.start) > rDate
             );
 
-            if (!hasNewApp) {
+            // Check if a NEW CAQ REQUEST (submission only) exists AFTER this refusal
+            const hasPendingRequest = sortedEvents.some(e =>
+                e.type === 'CAQ' &&
+                e.submissionDate &&
+                !e.start && !e.end && // No validity dates (pending)
+                new Date(e.submissionDate) > rDate
+            );
+
+            if (!hasApprovedCAQ && !hasPendingRequest) {
                 report.score -= 25;
                 report.controls.push({
                     type: TIMELINE_STATUS.ERROR,
                     message: `Refus du ${formatDate(rDate)} sans nouvelle demande détectée par la suite.`,
                     date: refusal.submissionDate
                 });
-            } else {
-                // If re-applied, we reduce the penalty or add an info note?
-                // For now, let's say it's "Handled" so no major error, but still a history note
+            } else if (hasApprovedCAQ) {
+                // Best case: CAQ was approved after refusal
                 report.controls.push({
-                    type: TIMELINE_STATUS.WARNING,
-                    message: `Refus du ${formatDate(rDate)} suivi d'une nouvelle demande (Correct).`,
+                    type: TIMELINE_STATUS.OK,
+                    message: `Refus du ${formatDate(rDate)} suivi d'un CAQ approuvé (Excellent).`,
                     date: refusal.submissionDate
                 });
-                report.score -= 5; // Small penalty for history
+                report.score -= 2; // Minimal penalty for history
+            } else if (hasPendingRequest) {
+                // Pending request exists but not yet approved
+                report.controls.push({
+                    type: TIMELINE_STATUS.WARNING,
+                    message: `Refus du ${formatDate(rDate)} suivi d'une nouvelle demande en attente.`,
+                    date: refusal.submissionDate
+                });
+                report.score -= 5; // Small penalty for pending
             }
         });
     }
@@ -153,6 +170,65 @@ export function analyzeTimeline(events) {
                     date: intent.submissionDate
                 });
             }
+        });
+    }
+
+    // C. Analyze Cancellations & Fraud (CRITICAL)
+    const intentCancels = sortedEvents.filter(e => e.type === 'INTENT_CANCEL');
+    const caqCancels = sortedEvents.filter(e => e.type === 'CAQ_CANCEL');
+    const fraudRejections = sortedEvents.filter(e => e.type === 'FRAUD_REJECTION');
+
+    // Intent to Cancel Analysis
+    if (intentCancels.length > 0) {
+        intentCancels.forEach(intent => {
+            const iDate = new Date(intent.submissionDate || intent.start);
+            // Check if DOCS_SENT exists AFTER intent (Response within 60 days)
+            const hasResponse = sortedEvents.some(e =>
+                e.type === 'DOCS_SENT' &&
+                new Date(e.submissionDate || e.start) > iDate
+            );
+
+            if (!hasResponse) {
+                report.score -= 30;
+                report.controls.push({
+                    type: TIMELINE_STATUS.ERROR,
+                    message: `🚨 Intention d'annulation du ${formatDate(iDate)} sans réponse documentée (60 jours requis).`,
+                    date: intent.submissionDate
+                });
+            } else {
+                report.controls.push({
+                    type: TIMELINE_STATUS.WARNING,
+                    message: `Intention d'annulation du ${formatDate(iDate)} répondue par un envoi de documents.`,
+                    date: intent.submissionDate
+                });
+                report.score -= 10; // Still a serious concern
+            }
+        });
+    }
+
+    // CAQ Cancellation (CRITICAL)
+    if (caqCancels.length > 0) {
+        report.score -= (caqCancels.length * 50); // Severe penalty
+        caqCancels.forEach(cancel => {
+            const cDate = new Date(cancel.submissionDate || cancel.start);
+            report.controls.push({
+                type: TIMELINE_STATUS.ERROR,
+                message: `🚫 ANNULATION DU CAQ le ${formatDate(cDate)} - Dossier gravement compromis (Art. 59 LIQ).`,
+                date: cancel.submissionDate
+            });
+        });
+    }
+
+    // Fraud Rejection (CRITICAL)
+    if (fraudRejections.length > 0) {
+        report.score -= (fraudRejections.length * 60); // Most severe penalty
+        fraudRejections.forEach(fraud => {
+            const fDate = new Date(fraud.submissionDate || fraud.start);
+            report.controls.push({
+                type: TIMELINE_STATUS.ERROR,
+                message: `⚖️ REJET POUR FAUX ET TROMPEUR le ${formatDate(fDate)} - Interdiction de 5 ans (Art. 56-57 LIQ).`,
+                date: fraud.submissionDate
+            });
         });
     }
 

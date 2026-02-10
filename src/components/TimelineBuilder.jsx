@@ -5,12 +5,15 @@ const EVENT_TYPES = [
     // ACTES ADMINISTRATIFS & DÉCISIONS
     { value: 'CAQ_REFUSAL', label: '⛔ Refus de CAQ', ref: 'Art. 11/13 RIQ', category: 'ADM' },
     { value: 'INTENT_REFUSAL', label: '⚠️ Intention de Refus', ref: 'GPI 3.2', category: 'ADM' },
-    { value: 'INTERVIEW', label: '🗣️ Convocation Entrevue', ref: '', category: 'ADM' },
+    { value: 'INTENT_CANCEL', label: '🚨 Intention d\'Annulation', ref: 'Art. 59 LIQ', category: 'ADM' },
+    { value: 'CAQ_CANCEL', label: '🚫 Annulation du CAQ', ref: 'Art. 59 LIQ', category: 'ADM' },
+    { value: 'FRAUD_REJECTION', label: '⚖️ Rejet pour Faux et Trompeur', ref: 'Art. 56-57 LIQ', category: 'ADM' },
+    { value: 'INTERVIEW', label: '🗣️ Convocation Entrevue', ref: 'Art. 55 LIQ', category: 'ADM' },
 
     // PARCOURS & VIE DU CANDIDAT
     { value: 'CAQ', label: '📜 Certificat (CAQ)', ref: 'Art. 13 RIQ', category: 'USR' },
     { value: 'WORK_PERMIT', label: '🪪 Permis de Travail/Études', ref: '', category: 'USR' },
-    { value: 'DOCS_SENT', label: '📤 Envoi de Documents', ref: '', category: 'USR' },
+    { value: 'DOCS_SENT', label: '📤 Envoi de Documents', ref: 'Art. 55 LIQ', category: 'USR' },
     { value: 'STUDIES', label: '🎓 Études (Programme)', ref: 'Art. 11 RIQ', category: 'USR' },
     { value: 'INSURANCE', label: '🏥 Assurance Maladie', ref: 'Art. 15 RIQ', category: 'USR' },
     { value: 'ENTRY', label: '🛬 Entrée au pays', ref: 'Art. 13 RIQ', category: 'USR' },
@@ -82,10 +85,10 @@ const TimelineBuilder = ({ events, setEvents }) => {
                         </div>
                     </div>
 
-                    {['CAQ', 'WORK_PERMIT', 'CAQ_REFUSAL', 'INTENT_REFUSAL', 'DOCS_SENT', 'INTERVIEW'].includes(newEvent.type) && (
+                    {['CAQ', 'WORK_PERMIT', 'CAQ_REFUSAL', 'INTENT_REFUSAL', 'INTENT_CANCEL', 'CAQ_CANCEL', 'FRAUD_REJECTION', 'DOCS_SENT', 'INTERVIEW'].includes(newEvent.type) && (
                         <div className="form-group fade-in highlight-group">
                             <label>
-                                {newEvent.type === 'CAQ' || newEvent.type === 'WORK_PERMIT' ? 'Date de Dépôt (Demande)' : 'Date de l\'événement / Envoi'}
+                                {newEvent.type === 'CAQ' || newEvent.type === 'WORK_PERMIT' ? 'Date de Dépôt (Demande)' : 'Date d\'envoi / ou début de l\'événement'}
                             </label>
                             <input
                                 type="date"
@@ -145,11 +148,11 @@ const TimelineBuilder = ({ events, setEvents }) => {
                         </div>
                     )}
 
-                    {!['CAQ_REFUSAL', 'INTENT_REFUSAL', 'DOCS_SENT', 'INTERVIEW', 'ENTRY', 'EXIT'].includes(newEvent.type) && (
+                    {!['CAQ_REFUSAL', 'INTENT_REFUSAL', 'INTENT_CANCEL', 'CAQ_CANCEL', 'FRAUD_REJECTION', 'DOCS_SENT', 'INTERVIEW', 'ENTRY', 'EXIT'].includes(newEvent.type) && (
                         <div className="highlight-group-success">
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label>Date Début / Réponse</label>
+                                    <label>Date Début</label>
                                     <input
                                         type="date"
                                         value={newEvent.start || ''}
