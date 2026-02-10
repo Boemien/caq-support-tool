@@ -95,12 +95,64 @@ export function analyzeTimeline(events) {
     }
 
     // 4. Refusals Impact
-    const refusals = sortedEvents.filter(e => e.type.includes('REFUSAL'));
+    // 4. Refusals & Intents Impact
+    const refusals = sortedEvents.filter(e => e.type === 'CAQ_REFUSAL');
+    const intents = sortedEvents.filter(e => e.type === 'INTENT_REFUSAL');
+
+    // A. Analyze Refusals
     if (refusals.length > 0) {
-        report.score -= (refusals.length * 25);
-        report.controls.push({
-            type: TIMELINE_STATUS.ERROR,
-            message: `${refusals.length} refus détecté(s) dans l'historique.`,
+        refusals.forEach(refusal => {
+            const rDate = new Date(refusal.submissionDate || refusal.start);
+            // Check if a NEW CAQ application exists AFTER this refusal
+            const hasNewApp = sortedEvents.some(e =>
+                e.type === 'CAQ' && // Assuming CAQ type can determine "Request" via visual logic, or we check if it starts after
+                new Date(e.submissionDate || e.start) > rDate
+            );
+
+            if (!hasNewApp) {
+                report.score -= 25;
+                report.controls.push({
+                    type: TIMELINE_STATUS.ERROR,
+                    message: `Refus du ${formatDate(rDate)} sans nouvelle demande détectée par la suite.`,
+                    date: refusal.submissionDate
+                });
+            } else {
+                // If re-applied, we reduce the penalty or add an info note?
+                // For now, let's say it's "Handled" so no major error, but still a history note
+                report.controls.push({
+                    type: TIMELINE_STATUS.WARNING,
+                    message: `Refus du ${formatDate(rDate)} suivi d'une nouvelle demande (Correct).`,
+                    date: refusal.submissionDate
+                });
+                report.score -= 5; // Small penalty for history
+            }
+        });
+    }
+
+    // B. Analyze Intents
+    if (intents.length > 0) {
+        intents.forEach(intent => {
+            const iDate = new Date(intent.submissionDate || intent.start);
+            // Check if DOCS_SENT exists AFTER intent (Response)
+            const hasResponse = sortedEvents.some(e =>
+                e.type === 'DOCS_SENT' &&
+                new Date(e.submissionDate || e.start) > iDate
+            );
+
+            if (!hasResponse) {
+                report.score -= 15;
+                report.controls.push({
+                    type: TIMELINE_STATUS.ERROR,
+                    message: `Intention de refus du ${formatDate(iDate)} sans envoi de documents justificatifs détecté.`,
+                    date: intent.submissionDate
+                });
+            } else {
+                report.controls.push({
+                    type: TIMELINE_STATUS.OK,
+                    message: `Intention de refus du ${formatDate(iDate)} répondue par un envoi de documents.`,
+                    date: intent.submissionDate
+                });
+            }
         });
     }
 

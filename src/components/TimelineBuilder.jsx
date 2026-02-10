@@ -6,11 +6,11 @@ const EVENT_TYPES = [
     { value: 'CAQ_REFUSAL', label: '⛔ Refus de CAQ', ref: 'Art. 11/13 RIQ', category: 'ADM' },
     { value: 'INTENT_REFUSAL', label: '⚠️ Intention de Refus', ref: 'GPI 3.2', category: 'ADM' },
     { value: 'INTERVIEW', label: '🗣️ Convocation Entrevue', ref: '', category: 'ADM' },
-    { value: 'DOCS_SENT', label: '📤 Envoi de Documents', ref: '', category: 'ADM' },
 
     // PARCOURS & VIE DU CANDIDAT
     { value: 'CAQ', label: '📜 Certificat (CAQ)', ref: 'Art. 13 RIQ', category: 'USR' },
     { value: 'WORK_PERMIT', label: '🪪 Permis de Travail/Études', ref: '', category: 'USR' },
+    { value: 'DOCS_SENT', label: '📤 Envoi de Documents', ref: '', category: 'USR' },
     { value: 'STUDIES', label: '🎓 Études (Programme)', ref: 'Art. 11 RIQ', category: 'USR' },
     { value: 'INSURANCE', label: '🏥 Assurance Maladie', ref: 'Art. 15 RIQ', category: 'USR' },
     { value: 'ENTRY', label: '🛬 Entrée au pays', ref: 'Art. 13 RIQ', category: 'USR' },
@@ -100,18 +100,20 @@ const TimelineBuilder = ({ events, setEvents }) => {
                             </div>
                         </div>
                     )}
-                    {['CAQ', 'CAQ_REFUSAL', 'INTENT_REFUSAL', 'DOCS_SENT', 'INTERVIEW'].includes(newEvent.type) && (
-                        <div className="form-group fade-in">
+                    {['CAQ', 'WORK_PERMIT', 'CAQ_REFUSAL', 'INTENT_REFUSAL', 'DOCS_SENT', 'INTERVIEW'].includes(newEvent.type) && (
+                        <div className="form-group fade-in highlight-group">
                             <label>
-                                {newEvent.type === 'CAQ' ? 'Date de la demande' : 'Date de l\'événement / Envoi'}
+                                {newEvent.type === 'CAQ' || newEvent.type === 'WORK_PERMIT' ? 'Date de Dépôt (Demande)' : 'Date de l\'événement / Envoi'}
                             </label>
                             <input
                                 type="date"
                                 value={newEvent.submissionDate || ''}
                                 onChange={(e) => setNewEvent({ ...newEvent, submissionDate: e.target.value })}
                             />
-                            <span className="input-hint">
-                                {newEvent.type === 'CAQ' ? 'Si vous ne mettez que cette date, il s\'agira d\'une demande en attente.' : 'Date unique de cet acte administratif.'}
+                            <span className="input-hint info">
+                                {['CAQ', 'WORK_PERMIT'].includes(newEvent.type)
+                                    ? '💡 Remplissez UNIQUEMENT ceci s\'il s\'agit d\'une demande en attente.'
+                                    : 'Date unique de cet acte administratif.'}
                             </span>
                         </div>
                     )}
