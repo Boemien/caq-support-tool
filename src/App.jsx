@@ -905,7 +905,19 @@ function App() {
                                             <button
                                                 className="btn-small"
                                                 onClick={() => setShow3DTimeline(true)}
-                                                style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '0.8rem', fontWeight: 600 }}
+                                                disabled={!timelineEvents || timelineEvents.length === 0}
+                                                title={(!timelineEvents || timelineEvents.length === 0) ? "Ajoutez des événements pour visualiser la 3D" : "Voir en 3D"}
+                                                style={{
+                                                    background: (!timelineEvents || timelineEvents.length === 0) ? '#cbd5e0' : 'var(--primary)',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '8px',
+                                                    padding: '6px 12px',
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: 600,
+                                                    cursor: (!timelineEvents || timelineEvents.length === 0) ? 'not-allowed' : 'pointer',
+                                                    opacity: (!timelineEvents || timelineEvents.length === 0) ? 0.7 : 1
+                                                }}
                                             >
                                                 👁️ Visionner en 3D
                                             </button>
@@ -1088,7 +1100,19 @@ function App() {
                                                 <button
                                                     className="btn-small"
                                                     onClick={() => setShow3DTimeline(true)}
-                                                    style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '0.8rem', fontWeight: 600 }}
+                                                    disabled={!timelineEvents || timelineEvents.length === 0}
+                                                    title={(!timelineEvents || timelineEvents.length === 0) ? "Ajoutez des événements pour visualiser la 3D" : "Voir en 3D"}
+                                                    style={{
+                                                        background: 'var(--primary)',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        borderRadius: '8px',
+                                                        padding: '6px 12px',
+                                                        fontSize: '0.8rem',
+                                                        fontWeight: 600,
+                                                        opacity: (!timelineEvents || timelineEvents.length === 0) ? 0.5 : 1,
+                                                        cursor: (!timelineEvents || timelineEvents.length === 0) ? 'not-allowed' : 'pointer'
+                                                    }}
                                                 >
                                                     👁️ Visionner en 3D
                                                 </button>
