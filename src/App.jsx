@@ -266,7 +266,7 @@ function App() {
                 <div className="brand">
                     <div className="logo-box"><FileText size={24} color="white" /></div>
                     <div className="brand-text">
-                        <h1>Outil d'accompagnement de demande de CAQ <span className="version">v1.1</span></h1>
+                        <h1>Outil d'accompagnement de demande de CAQ <br />pour étudiants étrangers <span className="version">v1.1</span></h1>
                         <div className="by-brand">par <a href="https://www.cvquebec.ca" target="_blank" rel="noopener noreferrer"><strong>CVQUEBEC</strong></a></div>
                     </div>
                 </div>
