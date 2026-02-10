@@ -1,37 +1,241 @@
-import React, { useEffect, useRef, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { format, differenceInDays } from 'date-fns';
+import { addMonths, addYears, differenceInDays, differenceInMonths, endOfMonth, format, startOfMonth, startOfYear } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { History } from 'lucide-react';
+
+const EVENT_LABELS = {
+    CAQ: 'Certificat (CAQ)',
+    CAQ_REFUSAL: 'Refus de CAQ',
+    INTENT_REFUSAL: 'Intention de refus',
+    DOCS_SENT: 'Envoi de documents',
+    INTERVIEW: 'Convocation entrevue',
+    ENTRY: "Entrée au pays",
+    EXIT: 'Sortie du territoire',
+    WORK_PERMIT: 'Permis travail/études',
+    STUDIES: 'Début des études',
+    INSURANCE: 'Assurance maladie',
+    MEDICAL: 'Maladie / congé médical'
+};
+
+const LANE_DEFS = [
+    {
+        id: 'immigration',
+        label: 'Immigration',
+        color: '#2563eb',
+        types: ['CAQ', 'CAQ_REFUSAL', 'INTENT_REFUSAL', 'WORK_PERMIT']
+    },
+    {
+        id: 'documents',
+        label: 'Documents',
+        color: '#14b8a6',
+        types: ['DOCS_SENT', 'INTERVIEW']
+    },
+    {
+        id: 'sejour',
+        label: 'Études & séjour',
+        color: '#f59e0b',
+        types: ['ENTRY', 'EXIT', 'STUDIES']
+    },
+    {
+        id: 'sante',
+        label: 'Santé',
+        color: '#f472b6',
+        types: ['INSURANCE', 'MEDICAL']
+    },
+    {
+        id: 'autre',
+        label: 'Autres',
+        color: '#94a3b8',
+        types: []
+    }
+];
+
+const toDate = value => {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const pickLane = event => {
+    const directLane = LANE_DEFS.find(lane => lane.types.includes(event.type));
+    if (directLane) return directLane;
+    if (event.category === 'ADM') return LANE_DEFS.find(lane => lane.id === 'documents');
+    if (event.category === 'USR') return LANE_DEFS.find(lane => lane.id === 'sejour');
+    return LANE_DEFS.find(lane => lane.id === 'autre');
+};
+
+const humanizeType = value => {
+    if (!value) return 'Événement';
+    return String(value)
+        .replace(/_/g, ' ')
+        .toLowerCase()
+        .replace(/(^|\s)\S/g, char => char.toUpperCase());
+};
+
+const buildEventTitle = event => {
+    const hasDecision = Boolean(event.start);
+    if (!hasDecision && event.type === 'CAQ') return 'Demande de CAQ';
+    if (!hasDecision && event.type === 'WORK_PERMIT') return 'Demande de permis';
+    return EVENT_LABELS[event.type] || humanizeType(event.type);
+};
+
+const formatDate = date => format(date, 'dd MMM yyyy', { locale: fr });
+
+const getDisplayLabel = event => {
+    const label = event?.label;
+    if (!label) return buildEventTitle(event);
+    if (label === event.type) return buildEventTitle(event);
+    if (label.includes('_')) return buildEventTitle(event);
+    return label;
+};
 
 const Timeline3D = ({ events = [], onBack }) => {
     const containerRef = useRef(null);
     const canvasRef = useRef(null);
     const requestRef = useRef();
     const [projectedLabels, setProjectedLabels] = useState([]);
+    const [projectedRanges, setProjectedRanges] = useState([]);
+    const [projectedMarkers, setProjectedMarkers] = useState([]);
 
-    // Sort events
-    const sortedEvents = useMemo(() => {
-        return [...events].sort((a, b) => {
-            const dateA = new Date(a.submissionDate || a.start || 0);
-            const dateB = new Date(b.submissionDate || b.start || 0);
-            return dateA - dateB;
+    const timelineData = useMemo(() => {
+        const items = events
+            .map((event, index) => {
+                const submissionDate = toDate(event.submissionDate);
+                const startDate = toDate(event.start);
+                const endDate = toDate(event.end);
+                const anchorDate = submissionDate || startDate || endDate;
+                if (!anchorDate) return null;
+
+                const lane = pickLane(event);
+                const durationDays = startDate && endDate
+                    ? Math.max(0, differenceInDays(endDate, startDate))
+                    : null;
+
+                return {
+                    id: event.id || `${event.type || 'event'}-${index}`,
+                    event,
+                    lane,
+                    submissionDate,
+                    startDate,
+                    endDate,
+                    anchorDate,
+                    durationDays,
+                    gapDays: null
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.anchorDate - b.anchorDate);
+
+        if (!items.length) {
+            return { items: [], minDate: null, maxDate: null, totalDays: 0 };
+        }
+
+        let minDate = items[0].anchorDate;
+        let maxDate = items[0].anchorDate;
+
+        items.forEach(item => {
+            const rangeStart = item.startDate || item.anchorDate;
+            const rangeEnd = item.endDate || item.anchorDate;
+            if (rangeStart < minDate) minDate = rangeStart;
+            if (rangeEnd > maxDate) maxDate = rangeEnd;
         });
+
+        const totalDays = Math.max(1, differenceInDays(maxDate, minDate) + 1);
+        const lastByLane = new Map();
+
+        items.forEach(item => {
+            item.dayIndex = Math.max(0, differenceInDays(item.anchorDate, minDate));
+            const lastDate = lastByLane.get(item.lane.id);
+            if (lastDate) {
+                item.gapDays = Math.max(0, differenceInDays(item.anchorDate, lastDate));
+            }
+            lastByLane.set(item.lane.id, item.endDate || item.anchorDate);
+        });
+
+        const laneBuckets = new Map();
+        items.forEach(item => {
+            if (!laneBuckets.has(item.lane.id)) laneBuckets.set(item.lane.id, []);
+            laneBuckets.get(item.lane.id).push(item);
+        });
+
+        laneBuckets.forEach(laneItems => {
+            laneItems.sort((a, b) => {
+                const startA = a.startDate || a.anchorDate;
+                const startB = b.startDate || b.anchorDate;
+                return startA - startB;
+            });
+
+            const trackEnds = [];
+
+            laneItems.forEach(item => {
+                const rangeStart = item.startDate || item.anchorDate;
+                const rangeEnd = item.endDate || item.startDate || item.anchorDate;
+                let trackIndex = trackEnds.findIndex(endDate => rangeStart >= endDate);
+                if (trackIndex === -1) {
+                    trackIndex = trackEnds.length;
+                    trackEnds.push(rangeEnd);
+                } else {
+                    trackEnds[trackIndex] = rangeEnd;
+                }
+                item.trackIndex = trackIndex;
+            });
+
+            laneItems.forEach(item => {
+                item.trackCount = trackEnds.length;
+            });
+        });
+
+        return { items, minDate, maxDate, totalDays };
     }, [events]);
 
     useEffect(() => {
-        if (!containerRef.current || !canvasRef.current) return;
+        if (!containerRef.current || !canvasRef.current) return undefined;
 
-        // --- SCENE SETUP ---
+        const { items, minDate, maxDate, totalDays } = timelineData;
+
+        if (!items.length || !minDate || !maxDate) {
+            setProjectedLabels([]);
+            setProjectedRanges([]);
+            setProjectedMarkers([]);
+            return undefined;
+        }
+
+        const container = containerRef.current;
+        const getSize = () => {
+            const { width, height } = container.getBoundingClientRect();
+            return {
+                width: Math.max(1, width),
+                height: Math.max(1, height)
+            };
+        };
+
+        const { width, height } = getSize();
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x020617);
+        scene.background = new THREE.Color(0x0b1220);
+        scene.fog = new THREE.Fog(0x0b1220, 40, 220);
 
-        const width = window.innerWidth;
-        const height = window.innerHeight;
+        const desiredLength = 120;
+        const scale = Math.min(0.35, Math.max(0.04, desiredLength / totalDays));
+        const timelineLength = totalDays * scale;
+        const laneSpacing = 7;
+        const laneOffset = ((LANE_DEFS.length - 1) * laneSpacing) / 2;
+        const baseY = 0.55;
+        const trackSpacing = 0.7;
 
-        const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
-        camera.position.set(0, 15, 40);
+        const dateToZ = date => -differenceInDays(date, minDate) * scale;
+        const laneX = laneIndex => laneIndex * laneSpacing - laneOffset;
+        const laneY = item => {
+            const trackCount = item.trackCount || 1;
+            const trackIndex = item.trackIndex || 0;
+            const offset = ((trackCount - 1) * trackSpacing) / 2;
+            return baseY + trackIndex * trackSpacing - offset;
+        };
+
+        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+        camera.position.set(0, 16, 48);
+        camera.lookAt(0, 0, -timelineLength / 2);
 
         const renderer = new THREE.WebGLRenderer({
             canvas: canvasRef.current,
@@ -41,143 +245,282 @@ const Timeline3D = ({ events = [], onBack }) => {
         renderer.setSize(width, height);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-        // --- LIGHTS ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
         scene.add(ambientLight);
 
-        const pointLight1 = new THREE.PointLight(0xffffff, 1.2);
-        pointLight1.position.set(10, 20, 10);
-        scene.add(pointLight1);
+        const keyLight = new THREE.DirectionalLight(0xffffff, 0.55);
+        keyLight.position.set(8, 18, 12);
+        scene.add(keyLight);
 
-        const pointLight2 = new THREE.PointLight(0x3182ce, 0.8);
-        pointLight2.position.set(-10, -10, -10);
-        scene.add(pointLight2);
+        const fillLight = new THREE.PointLight(0x60a5fa, 0.35);
+        fillLight.position.set(-12, 10, 8);
+        scene.add(fillLight);
 
-        // --- CONTROLS ---
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
+        controls.dampingFactor = 0.08;
+        controls.minDistance = 20;
+        controls.maxDistance = 160;
+        controls.maxPolarAngle = Math.PI * 0.78;
+        controls.target.set(0, 0, -timelineLength / 2);
+        controls.update();
 
-        // --- STARS ---
-        const starCount = 4000;
-        const starGeometry = new THREE.BufferGeometry();
-        const starPositions = new Float32Array(starCount * 3);
-        for (let i = 0; i < starCount * 3; i++) {
-            starPositions[i] = (Math.random() - 0.5) * 600;
-        }
-        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-        const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.4, transparent: true, opacity: 0.6 });
-        const stars = new THREE.Points(starGeometry, starMaterial);
-        scene.add(stars);
+        const grid = new THREE.GridHelper(200, 40, 0x1f2937, 0x0f172a);
+        grid.position.set(0, -0.4, -timelineLength / 2);
+        scene.add(grid);
 
-        // --- TIMELINE NODES ---
-        const nodeGroup = new THREE.Group();
-        const nodes = [];
+        const guidesGroup = new THREE.Group();
+        const railsGroup = new THREE.Group();
 
-        sortedEvents.forEach((event, i) => {
-            // Spiral-like path for visual depth
-            const x = Math.sin(i * 0.5) * 5;
-            const y = (i - sortedEvents.length / 2) * 2;
-            const z = -i * 12;
-
-            // Outer Glow Sphere
-            const glowGeo = new THREE.SphereGeometry(0.6, 16, 16);
-            // Color Logic based on Category/Type
-            let color = 0x718096; // Default Gray
-
-            if (event.type === 'CAQ') color = 0x003399; // Deep Blue
-            else if (['CAQ_REFUSAL', 'INTENT_REFUSAL'].includes(event.type)) color = 0xe53e3e; // Red
-            else if (['INTERVIEW', 'DOCS_SENT', 'WORK_PERMIT'].includes(event.type)) color = 0x805ad5; // Purple
-            else if (event.type === 'INSURANCE') color = 0x38a169; // Green
-            else if (['ENTRY', 'EXIT'].includes(event.type)) color = 0xed8936; // Orange
-            else if (event.type === 'MEDICAL') color = 0xf687b3; // Pink
-            else if (event.type === 'STUDIES') color = 0x3182ce; // Blue
-            else if (event.category === 'ADM') color = 0x805ad5; // Fallback Admin
-            else if (event.category === 'USR') color = 0x3182ce; // Fallback User
-
-            const glowMat = new THREE.MeshBasicMaterial({
-                color: color,
+        LANE_DEFS.forEach((lane, index) => {
+            const x = laneX(index);
+            const points = [
+                new THREE.Vector3(x, 0, 0),
+                new THREE.Vector3(x, 0, -timelineLength)
+            ];
+            const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+            const lineMat = new THREE.LineBasicMaterial({
+                color: lane.color,
                 transparent: true,
-                opacity: 0.2
+                opacity: 0.65
             });
-            const glow = new THREE.Mesh(glowGeo, glowMat);
-            glow.position.set(x, y, z);
-            nodeGroup.add(glow);
+            railsGroup.add(new THREE.Line(lineGeo, lineMat));
 
-            // Core Sphere
-            const geo = new THREE.SphereGeometry(0.3, 32, 32);
-            const mat = new THREE.MeshStandardMaterial({
-                color: color,
-                emissive: color,
-                emissiveIntensity: 1.5
+            const ribbonGeo = new THREE.BoxGeometry(0.9, 0.03, timelineLength);
+            const ribbonMat = new THREE.MeshStandardMaterial({
+                color: lane.color,
+                transparent: true,
+                opacity: 0.08
             });
-            const sphere = new THREE.Mesh(geo, mat);
-            sphere.position.set(x, y, z);
-            nodeGroup.add(sphere);
-
-            nodes.push({ sphere, event, index: i });
+            const ribbon = new THREE.Mesh(ribbonGeo, ribbonMat);
+            ribbon.position.set(x, -0.12, -timelineLength / 2);
+            railsGroup.add(ribbon);
         });
 
-        // --- CONNECTION PATH ---
-        if (nodes.length > 1) {
-            const curvePoints = nodes.map(n => n.sphere.position.clone());
-            const curve = new THREE.CatmullRomCurve3(curvePoints);
-            const tubeGeo = new THREE.TubeGeometry(curve, 100, 0.06, 8, false);
-            const tubeMat = new THREE.MeshStandardMaterial({
-                color: 0xffffff,
-                transparent: true,
-                opacity: 0.15
-            });
-            const tube = new THREE.Mesh(tubeGeo, tubeMat);
-            nodeGroup.add(tube);
+        const monthStart = startOfMonth(minDate);
+        const monthEnd = endOfMonth(maxDate);
+        const monthCount = Math.max(1, differenceInMonths(monthEnd, monthStart) + 1);
+        let monthStep = 1;
+        if (monthCount > 60) monthStep = 3;
+        if (monthCount > 120) monthStep = 6;
+        if (monthCount > 240) monthStep = 12;
 
-            // Duration Labels Markers
-            nodes.forEach((node, i) => {
-                if (i > 0) {
-                    const prevNode = nodes[i - 1];
-                    const midPoint = new THREE.Vector3().addVectors(node.sphere.position, prevNode.sphere.position).multiplyScalar(0.5);
-                    const days = differenceInDays(
-                        new Date(node.event.submissionDate || node.event.start),
-                        new Date(prevNode.event.submissionDate || prevNode.event.start)
-                    );
-                    node.durationToPrev = days;
-                    node.midPos = midPoint;
+        const monthLineMaterial = new THREE.LineBasicMaterial({
+            color: 0x1f2937,
+            transparent: true,
+            opacity: 0.65
+        });
+        const yearLineMaterial = new THREE.LineBasicMaterial({
+            color: 0x334155,
+            transparent: true,
+            opacity: 0.9
+        });
+
+        const markerX = laneX(0) - 8.4;
+        const markerTargets = [];
+
+        const monthLabelFormat = monthCount > 24 ? 'MMM yyyy' : 'MMM';
+
+        if (monthStep < 12) {
+            for (let cursor = monthStart; cursor <= monthEnd; cursor = addMonths(cursor, monthStep)) {
+                if (cursor >= minDate) {
+                    const z = dateToZ(cursor);
+                    const points = [
+                        new THREE.Vector3(laneX(0) - 1, -0.05, z),
+                        new THREE.Vector3(laneX(LANE_DEFS.length - 1) + 1, -0.05, z)
+                    ];
+                    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                    guidesGroup.add(new THREE.Line(geometry, monthLineMaterial));
                 }
+
+                if (cursor.getMonth() !== 0) {
+                    const labelDate = cursor < minDate ? minDate : cursor;
+                    markerTargets.push({
+                        id: `month-${cursor.toISOString()}`,
+                        position: new THREE.Vector3(markerX, -0.45, dateToZ(labelDate)),
+                        label: format(cursor, monthLabelFormat, { locale: fr }),
+                        kind: 'month',
+                        dayIndex: Math.max(0, differenceInDays(labelDate, minDate))
+                    });
+                }
+            }
+        }
+
+        for (let cursor = startOfYear(minDate); cursor <= maxDate; cursor = addYears(cursor, 1)) {
+            if (cursor >= minDate) {
+                const z = dateToZ(cursor);
+                const points = [
+                    new THREE.Vector3(laneX(0) - 1.2, -0.03, z),
+                    new THREE.Vector3(laneX(LANE_DEFS.length - 1) + 1.2, -0.03, z)
+                ];
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                guidesGroup.add(new THREE.Line(geometry, yearLineMaterial));
+            }
+
+            const labelDate = cursor < minDate ? minDate : cursor;
+            markerTargets.push({
+                id: `year-${cursor.getFullYear()}`,
+                position: new THREE.Vector3(markerX, -0.18, dateToZ(labelDate)),
+                label: format(cursor, 'yyyy', { locale: fr }),
+                kind: 'year',
+                dayIndex: Math.max(0, differenceInDays(labelDate, minDate))
             });
         }
 
-        scene.add(nodeGroup);
+        scene.add(guidesGroup);
+        scene.add(railsGroup);
 
-        // --- PROJECTION LOGIC ---
+        const nodesGroup = new THREE.Group();
+        const pathGroup = new THREE.Group();
+        const labelTargets = [];
+        const rangeTargets = [];
+
+        const laneBuckets = new Map();
+        items.forEach(item => {
+            if (!laneBuckets.has(item.lane.id)) laneBuckets.set(item.lane.id, []);
+            laneBuckets.get(item.lane.id).push(item);
+        });
+
+        laneBuckets.forEach((laneItems, laneId) => {
+            const laneIndex = LANE_DEFS.findIndex(lane => lane.id === laneId);
+            const laneColor = LANE_DEFS[laneIndex]?.color || '#94a3b8';
+            const points = laneItems.map(item => new THREE.Vector3(laneX(laneIndex), laneY(item), dateToZ(item.anchorDate)));
+            if (points.length > 1) {
+                const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+                const lineMat = new THREE.LineBasicMaterial({
+                    color: laneColor,
+                    transparent: true,
+                    opacity: 0.35
+                });
+                pathGroup.add(new THREE.Line(lineGeo, lineMat));
+            }
+        });
+
+        items.forEach(item => {
+            const laneIndex = LANE_DEFS.findIndex(lane => lane.id === item.lane.id);
+            const color = item.lane.color;
+            const x = laneX(laneIndex);
+            const z = dateToZ(item.anchorDate);
+            const y = laneY(item);
+
+            const nodeGeo = new THREE.SphereGeometry(0.35, 24, 24);
+            const nodeMat = new THREE.MeshStandardMaterial({
+                color,
+                emissive: new THREE.Color(color),
+                emissiveIntensity: 0.85
+            });
+            const node = new THREE.Mesh(nodeGeo, nodeMat);
+            node.position.set(x, y, z);
+            nodesGroup.add(node);
+
+            let rangeMidPos = null;
+            if (item.startDate && item.endDate) {
+                const startZ = dateToZ(item.startDate);
+                const endZ = dateToZ(item.endDate);
+                const minZ = Math.min(startZ, endZ);
+                const maxZ = Math.max(startZ, endZ);
+                const depth = Math.max(scale * 0.8, Math.abs(maxZ - minZ));
+                const midZ = (minZ + maxZ) / 2;
+
+                const barGeo = new THREE.BoxGeometry(1.1, 0.18, depth);
+                const barMat = new THREE.MeshStandardMaterial({
+                    color,
+                    transparent: true,
+                    opacity: 0.45
+                });
+                const bar = new THREE.Mesh(barGeo, barMat);
+                bar.position.set(x, y - 0.3, midZ);
+                nodesGroup.add(bar);
+
+                const edgeGeo = new THREE.EdgesGeometry(barGeo);
+                const edgeMat = new THREE.LineBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.2
+                });
+                const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+                edges.position.copy(bar.position);
+                nodesGroup.add(edges);
+
+                rangeMidPos = new THREE.Vector3(x, y - 0.3, midZ);
+            }
+
+            labelTargets.push({
+                id: item.id,
+                position: node.position.clone(),
+                item
+            });
+
+            if (rangeMidPos && item.durationDays !== null) {
+                const rangeStart = item.startDate || item.anchorDate;
+                const rangeEnd = item.endDate || item.anchorDate;
+                const rangeMid = new Date((rangeStart.getTime() + rangeEnd.getTime()) / 2);
+                rangeTargets.push({
+                    id: `range-${item.id}`,
+                    position: rangeMidPos.clone(),
+                    durationDays: item.durationDays,
+                    lane: item.lane,
+                    dayIndex: Math.max(0, differenceInDays(rangeMid, minDate))
+                });
+            }
+        });
+
+        scene.add(pathGroup);
+        scene.add(nodesGroup);
+
         const vector = new THREE.Vector3();
-
         const updateLabels = () => {
-            const newProjected = nodes.map(node => {
-                vector.copy(node.sphere.position);
-                vector.project(camera);
+            const { width: currentWidth, height: currentHeight } = getSize();
 
-                const screenX = (vector.x * 0.5 + 0.5) * width;
-                const screenY = (-vector.y * 0.5 + 0.5) * height;
-
-                // Hide if behind camera
-                const isVisible = vector.z < 1;
+            const maxOrder = totalDays || 1;
+            const projected = labelTargets.map(target => {
+                vector.copy(target.position).project(camera);
+                const x = (vector.x * 0.5 + 0.5) * currentWidth;
+                const y = (-vector.y * 0.5 + 0.5) * currentHeight;
+                const visible = vector.z > -1 && vector.z < 1;
 
                 return {
-                    id: node.event.id || node.index,
-                    x: screenX,
-                    y: screenY,
-                    visible: isVisible,
-                    event: node.event,
-                    duration: node.durationToPrev,
-                    midX: node.midPos ? ((new THREE.Vector3().copy(node.midPos).project(camera).x * 0.5 + 0.5) * width) : null,
-                    midY: node.midPos ? ((-new THREE.Vector3().copy(node.midPos).project(camera).y * 0.5 + 0.5) * height) : null,
-                    nodeZ: node.sphere.position.z
+                    id: target.id,
+                    x,
+                    y,
+                    visible,
+                    item: target.item,
+                    depth: target.position.z,
+                    order: maxOrder - (target.item.dayIndex ?? 0)
                 };
             });
-            setProjectedLabels(newProjected);
+
+            const projectedRange = rangeTargets.map(target => {
+                vector.copy(target.position).project(camera);
+                return {
+                    id: target.id,
+                    x: (vector.x * 0.5 + 0.5) * currentWidth,
+                    y: (-vector.y * 0.5 + 0.5) * currentHeight,
+                    visible: vector.z > -1 && vector.z < 1,
+                    durationDays: target.durationDays,
+                    lane: target.lane,
+                    order: maxOrder - (target.dayIndex ?? 0)
+                };
+            });
+
+            const projectedMarker = markerTargets.map(target => {
+                vector.copy(target.position).project(camera);
+                return {
+                    id: target.id,
+                    x: (vector.x * 0.5 + 0.5) * currentWidth,
+                    y: (-vector.y * 0.5 + 0.5) * currentHeight,
+                    visible: vector.z > -1 && vector.z < 1,
+                    label: target.label,
+                    kind: target.kind,
+                    order: maxOrder - (target.dayIndex ?? 0)
+                };
+            });
+
+            setProjectedLabels(projected);
+            setProjectedRanges(projectedRange);
+            setProjectedMarkers(projectedMarker);
         };
 
-        // --- ANIMATION LOOP ---
         const animate = () => {
             requestRef.current = requestAnimationFrame(animate);
             controls.update();
@@ -187,171 +530,314 @@ const Timeline3D = ({ events = [], onBack }) => {
 
         animate();
 
-        // --- HANDLE RESIZE ---
         const handleResize = () => {
-            const w = window.innerWidth;
-            const h = window.innerHeight;
-            camera.aspect = w / h;
+            const { width: nextWidth, height: nextHeight } = getSize();
+            camera.aspect = nextWidth / nextHeight;
             camera.updateProjectionMatrix();
-            renderer.setSize(w, h);
+            renderer.setSize(nextWidth, nextHeight);
         };
         window.addEventListener('resize', handleResize);
 
-        // Cleanup
         return () => {
             window.removeEventListener('resize', handleResize);
             cancelAnimationFrame(requestRef.current);
             renderer.dispose();
-            starGeometry.dispose();
-            starMaterial.dispose();
-            nodeGroup.traverse(child => {
+            grid.geometry.dispose();
+            grid.material.dispose();
+            guidesGroup.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            });
+            railsGroup.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            });
+            pathGroup.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            });
+            nodesGroup.traverse(child => {
                 if (child.geometry) child.geometry.dispose();
                 if (child.material) child.material.dispose();
             });
         };
-    }, [sortedEvents]);
+    }, [timelineData]);
+
+    const { minDate, maxDate, totalDays } = timelineData;
 
     return (
-        <div ref={containerRef} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: '#020617', fontFamily: 'Outfit, sans-serif' }}>
-            {/* UI Overlay */}
+        <div
+            ref={containerRef}
+            style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 99999,
+                background: 'linear-gradient(180deg, #0b1220 0%, #0f172a 100%)',
+                fontFamily: 'Outfit, sans-serif'
+            }}
+        >
             <div style={{ position: 'absolute', top: '2rem', left: '2rem', zIndex: 100000 }}>
                 <button
                     onClick={onBack}
                     style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
+                        background: 'rgba(15, 23, 42, 0.85)',
                         backdropFilter: 'blur(15px)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(148, 163, 184, 0.2)',
                         color: 'white',
                         padding: '12px 28px',
-                        borderRadius: '16px',
+                        borderRadius: '14px',
                         cursor: 'pointer',
                         fontWeight: 700,
                         fontSize: '0.9rem',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        boxShadow: '0 4px 24px -1px rgba(0, 0, 0, 0.2)'
+                        boxShadow: '0 8px 30px -10px rgba(0, 0, 0, 0.5)'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                    onMouseEnter={event => {
+                        event.currentTarget.style.background = 'rgba(30, 41, 59, 0.9)';
+                        event.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.35)';
+                    }}
+                    onMouseLeave={event => {
+                        event.currentTarget.style.background = 'rgba(15, 23, 42, 0.85)';
+                        event.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.2)';
+                    }}
                 >
                     ← Dashboard
                 </button>
             </div>
 
+            <div style={{ position: 'absolute', top: '2rem', right: '2rem', zIndex: 100000 }}>
+                <div
+                    style={{
+                        background: 'rgba(15, 23, 42, 0.82)',
+                        border: '1px solid rgba(148, 163, 184, 0.2)',
+                        borderRadius: '16px',
+                        padding: '16px 18px',
+                        color: 'white',
+                        minWidth: '220px',
+                        boxShadow: '0 12px 30px -18px rgba(15, 23, 42, 0.8)'
+                    }}
+                >
+                    <div style={{ fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.65 }}>
+                        Chemins
+                    </div>
+                    <div style={{ marginTop: '10px', display: 'grid', gap: '8px' }}>
+                        {LANE_DEFS.map(lane => (
+                            <div key={lane.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span
+                                    style={{
+                                        width: '26px',
+                                        height: '4px',
+                                        borderRadius: '999px',
+                                        background: lane.color,
+                                        opacity: 0.9
+                                    }}
+                                />
+                                <span style={{ fontSize: '13px', fontWeight: 600, opacity: 0.9 }}>{lane.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            <div style={{ position: 'absolute', bottom: '6rem', left: '2rem', zIndex: 100000 }}>
+                <div
+                    style={{
+                        background: 'rgba(15, 23, 42, 0.82)',
+                        border: '1px solid rgba(148, 163, 184, 0.18)',
+                        borderRadius: '16px',
+                        padding: '14px 18px',
+                        color: 'white',
+                        minWidth: '240px'
+                    }}
+                >
+                    <div style={{ fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.65 }}>
+                        Période globale
+                    </div>
+                    <div style={{ marginTop: '8px', fontSize: '14px', fontWeight: 600 }}>
+                        {minDate && maxDate ? `${formatDate(minDate)} → ${formatDate(maxDate)}` : '—'}
+                    </div>
+                    <div style={{ marginTop: '6px', fontSize: '12px', opacity: 0.75 }}>
+                        {totalDays ? `${totalDays} jours couverts` : 'Aucun événement'}
+                    </div>
+                </div>
+            </div>
+
             <canvas ref={canvasRef} style={{ display: 'block' }} />
 
-            {/* 2D HTML Labels Layer */}
             <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-                {projectedLabels.map(label => (
-                    label.visible && (
-                        <React.Fragment key={label.id}>
-                            {/* Duration Indicator */}
-                            {label.duration !== undefined && label.midX && (
-                                <div style={{
-                                    position: 'absolute',
-                                    left: label.midX,
-                                    top: label.midY,
-                                    transform: 'translate(-50%, -50%)',
-                                    color: 'rgba(148, 163, 184, 0.8)',
-                                    fontSize: '11px',
-                                    fontWeight: 600,
-                                    background: 'rgba(15, 23, 42, 0.4)',
-                                    padding: '2px 8px',
-                                    borderRadius: '10px',
-                                    border: '1px solid rgba(148, 163, 184, 0.2)'
-                                }}>
-                                    +{label.duration} j
-                                </div>
-                            )}
+                {projectedMarkers.map(marker => (
+                    marker.visible && (
+                        <div
+                            key={marker.id}
+                            style={{
+                                position: 'absolute',
+                                left: marker.x,
+                                top: marker.y,
+                                transform: 'translate(-50%, -50%)',
+                                zIndex: 1000 + marker.order,
+                                color: marker.kind === 'year' ? 'rgba(226, 232, 240, 0.95)' : 'rgba(148, 163, 184, 0.95)',
+                                fontSize: marker.kind === 'year' ? '12px' : '10px',
+                                fontWeight: marker.kind === 'year' ? 700 : 600,
+                                letterSpacing: marker.kind === 'year' ? '0.06em' : '0.04em',
+                                background: marker.kind === 'year' ? 'rgba(15, 23, 42, 0.85)' : 'rgba(15, 23, 42, 0.6)',
+                                padding: marker.kind === 'year' ? '3px 10px' : '2px 8px',
+                                borderRadius: '999px',
+                                border: marker.kind === 'year'
+                                    ? '1px solid rgba(148, 163, 184, 0.5)'
+                                    : '1px solid rgba(148, 163, 184, 0.25)',
+                                textTransform: marker.kind === 'year' ? 'uppercase' : 'none',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            {marker.label}
+                        </div>
+                    )
+                ))}
 
-                            {/* Main Event Card */}
-                            <div style={{
+                {projectedRanges.map(range => (
+                    range.visible && (
+                        <div
+                            key={range.id}
+                            style={{
+                                position: 'absolute',
+                                left: range.x,
+                                top: range.y,
+                                transform: 'translate(-50%, -50%)',
+                                zIndex: 1200 + range.order,
+                                color: 'rgba(226, 232, 240, 0.9)',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                background: 'rgba(15, 23, 42, 0.7)',
+                                padding: '3px 10px',
+                                borderRadius: '999px',
+                                border: `1px solid ${range.lane.color}66`,
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            Durée: {range.durationDays} j
+                        </div>
+                    )
+                ))}
+
+                {projectedLabels.map(label => {
+                    if (!label.visible) return null;
+
+                    const { item } = label;
+                    const hasRange = item.startDate && item.endDate;
+                    const title = buildEventTitle(item.event);
+                    const mainLabel = getDisplayLabel(item.event);
+                    const dateLine = hasRange
+                        ? `${formatDate(item.startDate)} → ${formatDate(item.endDate)}`
+                        : formatDate(item.anchorDate);
+
+                    return (
+                        <div
+                            key={label.id}
+                            style={{
                                 position: 'absolute',
                                 left: label.x,
                                 top: label.y,
-                                transform: 'translate(20px, -50%)',
-                                background: 'rgba(15, 23, 42, 0.9)',
+                                transform: 'translate(18px, -50%)',
+                                zIndex: 1500 + label.order,
+                                background: 'rgba(15, 23, 42, 0.92)',
                                 backdropFilter: 'blur(12px)',
-                                padding: '12px 16px',
-                                borderRadius: '14px',
-                                border: `2px solid ${label.event.type === 'CAQ' ? '#00339999' : '#3182ce99'}`,
+                                padding: '14px 16px',
+                                borderRadius: '16px',
+                                border: `1.5px solid ${item.lane.color}99`,
                                 color: 'white',
-                                minWidth: '180px',
-                                pointerEvents: 'none',
-                                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4)',
-                                transition: 'opacity 0.2s',
-                                opacity: Math.max(0.3, 1 + label.nodeZ / 100) // Simple depth sorting via opacity
-                            }}>
-                                <div style={{
+                                minWidth: '210px',
+                                maxWidth: '260px',
+                                boxShadow: '0 12px 28px -12px rgba(15, 23, 42, 0.7)',
+                                opacity: Math.max(0.25, 1 + label.depth / 120)
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                <span style={{
                                     fontSize: '10px',
                                     textTransform: 'uppercase',
-                                    fontWeight: 800,
-                                    letterSpacing: '0.05em',
-                                    marginBottom: '4px',
-                                    color: label.event.type === 'CAQ' ? '#60a5fa' : '#93c5fd'
+                                    letterSpacing: '0.08em',
+                                    fontWeight: 700,
+                                    color: item.lane.color
                                 }}>
-                                    {(() => {
-                                        const EVENT_LABELS = {
-                                            'CAQ': 'Certificat (CAQ)',
-                                            'CAQ_REFUSAL': 'Refus de CAQ',
-                                            'INTENT_REFUSAL': 'Intention de Refus',
-                                            'DOCS_SENT': 'Envoi de Documents',
-                                            'INTERVIEW': 'Convocation Entrevue',
-                                            'ENTRY': 'Entrée au pays',
-                                            'EXIT': 'Sortie du territoire',
-                                            'WORK_PERMIT': 'Permis Travail/Études',
-                                            'STUDIES': 'Début des Études',
-                                            'INSURANCE': 'Assurance Maladie',
-                                            'MEDICAL': 'Maladie / Congé Médical'
-                                        };
-
-                                        // Logic to distinguish Request vs Obtained
-                                        const hasDecision = !!label.event.start;
-                                        let text = EVENT_LABELS[label.event.type] || label.event.type;
-
-                                        if (!hasDecision && ['CAQ', 'WORK_PERMIT'].includes(label.event.type)) {
-                                            if (label.event.type === 'CAQ') text = "Demande de CAQ";
-                                            if (label.event.type === 'WORK_PERMIT') text = "Demande de Permis";
-                                        }
-
-                                        return text;
-                                    })()}
-                                </div>
-                                <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '4px' }}>
-                                    {label.event.label}
-                                </div>
-                                <div style={{ fontSize: '11px', opacity: 0.7, fontWeight: 500 }}>
-                                    {label.event.start && label.event.end ? (
-                                        <>
-                                            {format(new Date(label.event.start), 'dd MMM yyyy', { locale: fr })} - {format(new Date(label.event.end), 'dd MMM yyyy', { locale: fr })}
-                                        </>
-                                    ) : (
-                                        format(new Date(label.event.submissionDate || label.event.start), 'dd MMMM yyyy', { locale: fr })
-                                    )}
-                                </div>
+                                    {title}
+                                </span>
+                                <span style={{
+                                    fontSize: '10px',
+                                    padding: '2px 8px',
+                                    borderRadius: '999px',
+                                    background: `${item.lane.color}33`,
+                                    color: 'white',
+                                    fontWeight: 700
+                                }}>
+                                    {item.lane.label}
+                                </span>
                             </div>
-                        </React.Fragment>
-                    )
-                ))}
+
+                            <div style={{ fontWeight: 700, fontSize: '14px', marginTop: '6px', marginBottom: '6px' }}>
+                                {mainLabel}
+                            </div>
+
+                            {item.submissionDate && hasRange && (
+                                <div style={{ fontSize: '11px', opacity: 0.75, marginBottom: '4px' }}>
+                                    Soumission: {formatDate(item.submissionDate)}
+                                </div>
+                            )}
+
+                            <div style={{ fontSize: '11px', opacity: 0.8 }}>
+                                {hasRange ? 'Période:' : 'Date:'} {dateLine}
+                            </div>
+
+                            <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                {item.durationDays !== null && (
+                                    <span
+                                        style={{
+                                            fontSize: '10px',
+                                            padding: '3px 8px',
+                                            borderRadius: '999px',
+                                            background: `${item.lane.color}33`,
+                                            border: `1px solid ${item.lane.color}55`
+                                        }}
+                                    >
+                                        Durée: {item.durationDays} j
+                                    </span>
+                                )}
+                                {item.gapDays !== null && (
+                                    <span
+                                        style={{
+                                            fontSize: '10px',
+                                            padding: '3px 8px',
+                                            borderRadius: '999px',
+                                            background: 'rgba(148, 163, 184, 0.15)',
+                                            border: '1px solid rgba(148, 163, 184, 0.2)'
+                                        }}
+                                    >
+                                        Délai précédent: {item.gapDays} j
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
 
-            {/* Hint overlay */}
-            <div style={{
-                position: 'absolute',
-                bottom: '3rem',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                color: 'rgba(255,255,255,0.4)',
-                fontSize: '0.9rem',
-                textAlign: 'center',
-                pointerEvents: 'none',
-                background: 'rgba(255,255,255,0.05)',
-                padding: '10px 24px',
-                borderRadius: '50px',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.05)'
-            }}>
+            <div
+                style={{
+                    position: 'absolute',
+                    bottom: '2.5rem',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    color: 'rgba(226, 232, 240, 0.7)',
+                    fontSize: '0.9rem',
+                    textAlign: 'center',
+                    pointerEvents: 'none',
+                    background: 'rgba(15, 23, 42, 0.65)',
+                    padding: '10px 24px',
+                    borderRadius: '999px',
+                    border: '1px solid rgba(148, 163, 184, 0.2)'
+                }}
+            >
                 <History size={14} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                Reconstitution temporelle • Utilisez la souris (Molette = Zoom)
+                Timeline multidimensionnelle • Molette = Zoom • Glisser = Rotation
             </div>
         </div>
     );
