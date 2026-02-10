@@ -44,6 +44,7 @@ const INITIAL_FORM_DATA = {
     prevCAQEnd: '',
     prevStudyStart: '',
     prevStudyEnd: '',
+    prevStudyInProgress: false,
     entryDate: '',
     isNewProgram: false,
     payerType: 'self',
@@ -168,6 +169,23 @@ function App() {
             // Logic Coherence: If Primary study level, ensure category is MINEUR
             if (name === 'studyLevel' && val === 'Primaire' && prev.category.startsWith('MAJ')) {
                 next.category = prev.category.replace('MAJEUR', 'MINEUR');
+            }
+
+            // Logic Coherence: Sync Category with Age (DOB)
+            if (name === 'dob' && val) {
+                const birthDate = new Date(val);
+                const today = new Date();
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const m = today.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+
+                if (age < 17 && prev.category.startsWith('MAJ')) {
+                    next.category = prev.category.replace('MAJEUR', 'MINEUR');
+                } else if (age >= 17 && prev.category.startsWith('MIN')) {
+                    next.category = prev.category.replace('MINEUR', 'MAJEUR');
+                }
             }
 
             return next;
@@ -431,9 +449,33 @@ function App() {
                                                 <label>Début études précédentes</label>
                                                 <input type="date" name="prevStudyStart" value={formData.prevStudyStart} onChange={handleInputChange} />
                                             </div>
-                                            <div className="form-group">
+                                            <div className="form-group" style={{ position: 'relative' }}>
                                                 <label>Fin études précédentes</label>
-                                                <input type="date" name="prevStudyEnd" value={formData.prevStudyEnd} onChange={handleInputChange} />
+                                                <input
+                                                    type="date"
+                                                    name="prevStudyEnd"
+                                                    value={formData.prevStudyEnd}
+                                                    onChange={handleInputChange}
+                                                    disabled={formData.prevStudyInProgress}
+                                                    style={{ opacity: formData.prevStudyInProgress ? 0.5 : 1 }}
+                                                />
+                                                <label className="checkbox-item" style={{ marginTop: '8px', fontSize: '0.9rem' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        name="prevStudyInProgress"
+                                                        checked={formData.prevStudyInProgress}
+                                                        onChange={(e) => {
+                                                            const checked = e.target.checked;
+                                                            setFormData(prev => ({
+                                                                ...prev,
+                                                                prevStudyInProgress: checked,
+                                                                prevStudyEnd: checked ? '' : prev.prevStudyEnd,
+                                                                isNewProgram: checked ? false : prev.isNewProgram
+                                                            }));
+                                                        }}
+                                                    />
+                                                    <span>Études toujours en cours</span>
+                                                </label>
                                             </div>
                                         </div>
                                         <div className="form-row" style={{ marginTop: '0.5rem' }}>
@@ -441,11 +483,30 @@ function App() {
                                                 <label>Date de première entrée au pays</label>
                                                 <input type="date" name="entryDate" value={formData.entryDate} onChange={handleInputChange} />
                                             </div>
-                                            <div className="form-group">
-                                                <label className="checkbox-item" style={{ justifyContent: 'flex-start', height: '100%', marginTop: '1.5rem' }}>
-                                                    <input type="checkbox" name="isNewProgram" checked={formData.isNewProgram} onChange={handleInputChange} />
-                                                    <span>Nouveau programme d'études ?</span>
-                                                </label>
+                                            <div className="form-group" style={{ marginTop: '1.5rem' }}>
+                                                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Nouveau programme d'études ?</label>
+                                                <div className="segmented-control">
+                                                    <label className={`segment ${formData.isNewProgram === true ? 'active' : ''}`}>
+                                                        <input
+                                                            type="radio"
+                                                            name="isNewProgram"
+                                                            value="true"
+                                                            checked={formData.isNewProgram === true}
+                                                            onChange={(e) => setFormData(prev => ({ ...prev, isNewProgram: true }))}
+                                                        />
+                                                        Oui (Admission)
+                                                    </label>
+                                                    <label className={`segment ${formData.isNewProgram === false ? 'active' : ''}`}>
+                                                        <input
+                                                            type="radio"
+                                                            name="isNewProgram"
+                                                            value="false"
+                                                            checked={formData.isNewProgram === false}
+                                                            onChange={(e) => setFormData(prev => ({ ...prev, isNewProgram: false }))}
+                                                        />
+                                                        Non (Même programme)
+                                                    </label>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -465,7 +526,11 @@ function App() {
                                     </label>
                                     <label className="checkbox-item">
                                         <input type="checkbox" name="admissionLetter" checked={formData.admissionLetter} onChange={handleInputChange} />
-                                        <span>Admission / Attestation fréquentation</span>
+                                        <span>
+                                            {formData.isNewProgram
+                                                ? "Lettre d'admission (Nouveau programme)"
+                                                : "Attestation de fréquentation (Programme actuel)"}
+                                        </span>
                                     </label>
 
                                     {formData.applicationType === 'Renouvellement' && (
@@ -946,7 +1011,7 @@ function App() {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             {reportSource === 'dossier' ? (
                                 <div className="summary-banner" style={{ background: getRecommendationColor(analysis.recommendation) }}>
                                     <div className="rec-info">

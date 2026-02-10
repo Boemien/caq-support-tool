@@ -59,14 +59,24 @@ export function analyzeDossier(data) {
         legalRef: 'Art. 13 RIQ'
     });
 
+    // Dynamic Admission / Attestation Requirement
+    const isNewProgram = data.isNewProgram === true; // Strict check
+    const admissionLabel = isNewProgram
+        ? "Lettre d'admission (Nouveau programme)"
+        : "Attestation de fréquentation (Programme actuel)";
+
+    const admissionNote = isNewProgram
+        ? "Obligatoire : Vous débutez un nouveau programme. Une lettre d'admission complète est requise."
+        : "Obligatoire : Vous poursuivez votre programme actuel. Une attestation de fréquentation récente est requise.";
+
     controls.push({
-        label: "Lettre d'admission ou Attestation",
+        label: admissionLabel,
         status: data.admissionLetter ? STATUS.OK : (isPrimary || isMinorCategory ? STATUS.OK : STATUS.MISSING),
         severity: SEVERITY.BLOCKING,
         legalRef: 'Art. 13 RIQ',
         note: (isPrimary || isMinorCategory)
             ? 'Note : Pas requise pour les moins de 16 ans au primaire/secondaire si un parent a un statut. Sinon, à fournir.'
-            : 'Doit inclure : programme, diplôme, dates début/fin, nb crédits/heures, stage (< 50% durée), conditions admission, montant frais scolarité.'
+            : admissionNote
     });
 
     // Renewal specific documents & Continuity
@@ -91,11 +101,18 @@ export function analyzeDossier(data) {
         }
 
         // Continuity check: Previous CAQ vs Previous Study
-        if (data.prevCAQStart && data.prevCAQEnd && data.prevStudyStart && data.prevStudyEnd) {
+        if (data.prevCAQStart && data.prevCAQEnd && data.prevStudyStart && (data.prevStudyEnd || data.prevStudyInProgress)) {
             const caqS = new Date(data.prevCAQStart);
             const caqE = new Date(data.prevCAQEnd);
             const studyS = new Date(data.prevStudyStart);
-            const studyE = new Date(data.prevStudyEnd);
+            // If in progress, we consider "now" or "future" as the end for continuity check
+            // However, the rule is: Does the CAQ cover the study period?
+            // If studies are in progress, the CAQ must still be valid OR the study period start-to-now must be covered.
+            const studyE = data.prevStudyInProgress ? new Date() : new Date(data.prevStudyEnd);
+
+            // Check overlap or coverage. 
+            // Simplified: The Study Period (Start to End/Now) must be somewhat within CAQ validity
+            // or CAQ must cover the start.
 
             const isCovered = (caqS <= studyS) && (caqE >= studyE);
 
@@ -104,7 +121,9 @@ export function analyzeDossier(data) {
                 status: isCovered ? STATUS.OK : STATUS.MISSING,
                 severity: SEVERITY.MAJOR,
                 legalRef: 'Art. 11 RIQ',
-                note: !isCovered ? 'La période du CAQ précédent ne couvre pas entièrement les études déclarées.' : 'Continuité vérifiée.'
+                note: !isCovered
+                    ? `La période du CAQ précédent (${data.prevCAQStart} au ${data.prevCAQEnd}) ne couvre pas entièrement la période d'études déclarée.`
+                    : 'Continuité vérifiée.'
             });
         }
 
