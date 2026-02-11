@@ -293,11 +293,20 @@ export function analyzeTimeline(events) {
             });
 
             if (overlappingIns.length === 0) {
-                report.insuranceIssues.push({
-                    type: TIMELINE_STATUS.WARNING,
-                    message: `Période CAQ du ${caq.start} au ${caq.end} entièrement sans preuve d'assurance.`
-                });
-                report.score -= 15;
+                // Relaxe logic for University level
+                if (caq.level === 'Universitaire') {
+                    report.controls.push({ // Use controls instead of insuranceIssues to lower severity visually if needed, or stick to insuranceIssues but with different message
+                        type: TIMELINE_STATUS.OK, // or WARNING but low impact
+                        message: `Période CAQ du ${caq.start} : Assurance universitaire présumée incluse.`
+                    });
+                    // No penalty or very small
+                } else {
+                    report.insuranceIssues.push({
+                        type: TIMELINE_STATUS.WARNING,
+                        message: `Période CAQ du ${caq.start} au ${caq.end} entièrement sans preuve d'assurance.`
+                    });
+                    report.score -= 15;
+                }
             } else {
                 // Determine if there are specific gaps
                 // Sort insurance by start date
@@ -312,18 +321,20 @@ export function analyzeTimeline(events) {
                     // If there's a gap between the end of the last covered period and the start of the current insurance
                     if (iStart > addDays(coveredUntil, 1)) {
                         // Gap detected
-                        report.insuranceIssues.push({
-                            type: TIMELINE_STATUS.WARNING,
-                            message: `Trou d'assurance du ${formatDate(coveredUntil)} au ${formatDate(addDays(iStart, -1))} pendant le CAQ.`
-                        });
-                        report.score -= 5;
+                        if (caq.level !== 'Universitaire') {
+                            report.insuranceIssues.push({
+                                type: TIMELINE_STATUS.WARNING,
+                                message: `Trou d'assurance du ${formatDate(coveredUntil)} au ${formatDate(addDays(iStart, -1))} pendant le CAQ.`
+                            });
+                            report.score -= 5;
+                        }
                     }
                     // Update coveredUntil to the latest end date of insurance
                     if (iEnd > coveredUntil) coveredUntil = iEnd;
                 });
 
                 // Check for a gap at the end of the CAQ period
-                if (coveredUntil < cEnd) {
+                if (coveredUntil < cEnd && caq.level !== 'Universitaire') {
                     report.insuranceIssues.push({
                         type: TIMELINE_STATUS.WARNING,
                         message: `Fin de CAQ non couverte par assurance à partir du ${formatDate(addDays(coveredUntil, 1))}.`

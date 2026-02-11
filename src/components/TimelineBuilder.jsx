@@ -30,6 +30,7 @@ const TimelineBuilder = ({ events, setEvents }) => {
         label: '',
         note: '',
         linkedProgram: '',
+        level: '', // New field for study level
         isOutsideCanada: false,
         submissionDate: '',
     });
@@ -43,7 +44,7 @@ const TimelineBuilder = ({ events, setEvents }) => {
             legalRef: typeInfo.ref,
             category: typeInfo.category // Save category for later use
         }]);
-        setNewEvent({ type: 'CAQ', start: '', end: '', label: '', note: '', linkedProgram: '', isOutsideCanada: false, submissionDate: '' });
+        setNewEvent({ type: 'CAQ', start: '', end: '', label: '', note: '', linkedProgram: '', level: '', isOutsideCanada: false, submissionDate: '' });
     };
 
     const removeEvent = (id) => {
@@ -127,7 +128,21 @@ const TimelineBuilder = ({ events, setEvents }) => {
                                     value={newEvent.linkedProgram}
                                     onChange={(e) => setNewEvent({ ...newEvent, linkedProgram: e.target.value })}
                                 />
-                                {newEvent.type === 'CAQ' && (
+                                <select
+                                    value={newEvent.level || ''}
+                                    onChange={(e) => setNewEvent({ ...newEvent, level: e.target.value })}
+                                    style={{ padding: '0.6rem', borderRadius: '8px', border: '1px solid #ccc' }}
+                                >
+                                    <option value="">-- Niveau --</option>
+                                    <option value="Primaire">Primaire</option>
+                                    <option value="Secondaire">Secondaire</option>
+                                    <option value="Collégial">Collégial</option>
+                                    <option value="Professionnel">Professionnel</option>
+                                    <option value="Universitaire">Universitaire</option>
+                                </select>
+                            </div>
+                            {newEvent.type === 'CAQ' && (
+                                <div style={{ marginTop: '0.5rem' }}>
                                     <label className="checkbox-item mini">
                                         <input
                                             type="checkbox"
@@ -136,8 +151,8 @@ const TimelineBuilder = ({ events, setEvents }) => {
                                         />
                                         <span>Demande Hors Canada</span>
                                     </label>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -218,12 +233,14 @@ const TimelineBuilder = ({ events, setEvents }) => {
                                     {event.linkedProgram && (
                                         <div className="linked-info">
                                             <GraduationCap size={12} /> Destiné au programme : <strong>{event.linkedProgram}</strong>
+                                            {event.level && <span style={{ marginLeft: '4px', opacity: 0.8 }}>({event.level})</span>}
                                             {event.isOutsideCanada && <span className="outside-tag ml-4">📍 Hors Canada</span>}
                                         </div>
                                     )}
-                                    {event.type === 'CAQ' && event.isOutsideCanada && !event.linkedProgram && (
+                                    {((event.type === 'CAQ' && event.isOutsideCanada) || event.level) && !event.linkedProgram && (
                                         <div className="linked-info">
-                                            <span className="outside-tag">📍 Demande effectuée Hors Canada</span>
+                                            {event.level && <span style={{ marginRight: '6px' }}>🎓 {event.level}</span>}
+                                            {event.type === 'CAQ' && event.isOutsideCanada && <span className="outside-tag">📍 Demande Hors Canada</span>}
                                         </div>
                                     )}
                                     {event.note && <p className="event-note">{event.note}</p>}
