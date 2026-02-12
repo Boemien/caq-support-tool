@@ -531,7 +531,7 @@ const Timeline3D = ({ events = [], onBack }) => {
             const z = dateToZ(alert.date);
             return {
                 ...alert,
-                position: new THREE.Vector3(0, 4.5, z) // Float above the center
+                position: new THREE.Vector3(0, 7.5, z) // Elevated significantly to clear event labels
             };
         });
 
@@ -961,25 +961,27 @@ const Timeline3D = ({ events = [], onBack }) => {
                                 position: 'absolute',
                                 left: alert.x,
                                 top: alert.y,
-                                // Stack upwards: -100% (base) - (index * 110%) to account for gap
+                                // Stack upwards: -100% (base) - (index * 115%) to account for gap
                                 transform: `translate(-50%, calc(-100% - ${alert.stackIndex * 115}%))`,
-                                zIndex: 3000 + alert.order + alert.stackIndex,
-                                background: alert.type === 'error' ? 'rgba(220, 38, 38, 0.95)' : 'rgba(217, 119, 6, 0.95)',
+                                zIndex: 2500 + alert.order + alert.stackIndex, // Reduced z-index to allow overlapping main popups if needed
+                                background: alert.type === 'error' ? 'rgba(220, 38, 38, 0.4)' : 'rgba(217, 119, 6, 0.4)',
+                                backdropFilter: 'blur(10px) saturate(180%)',
+                                WebkitBackdropFilter: 'blur(10px) saturate(180%)',
                                 color: 'white',
-                                padding: '8px 12px',
-                                borderRadius: '10px',
-                                border: '1px solid rgba(255, 255, 255, 0.2)',
-                                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+                                padding: '6px 10px',
+                                borderRadius: '8px',
+                                border: alert.type === 'error' ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+                                boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
                                 pointerEvents: 'auto',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '8px',
-                                minWidth: '220px',
-                                maxWidth: '300px'
+                                gap: '6px',
+                                minWidth: '180px',
+                                maxWidth: '260px'
                             }}
                         >
-                            <AlertTriangle size={16} />
-                            <div style={{ fontSize: '11px', fontWeight: 600, lineHeight: '1.4' }}>
+                            <AlertTriangle size={14} />
+                            <div style={{ fontSize: '10px', fontWeight: 600, lineHeight: '1.3' }}>
                                 {alert.message}
                             </div>
                         </div>
