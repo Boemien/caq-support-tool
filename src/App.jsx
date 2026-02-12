@@ -2,10 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react'
 import {
     FileText, User, GraduationCap, Users, ShieldAlert,
     CheckCircle2, History, Timer, AlertTriangle, Info,
-    DollarSign, ClipboardCheck, ArrowRight, RotateCcw
+    DollarSign, ClipboardCheck, ArrowRight, RotateCcw,
+    Printer
 } from 'lucide-react'
 import { analyzeDossier } from './logic/ruleEngine'
 import { analyzeTimeline, TIMELINE_STATUS } from './logic/timelineRules'
+import { generateDetailedReport } from './services/geminiService'
 import { STATUS, SEVERITY, RECOMMENDATION, FINANCE_MIFI_COUNTRIES } from './logic/constants'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
@@ -16,6 +18,7 @@ import { lazy, Suspense } from 'react'
 import Timeline from './components/Timeline'
 import Checklist from './components/Checklist'
 import TimelineBuilder from './components/TimelineBuilder'
+import DetailedReportModal from './components/DetailedReportModal'
 
 const Timeline3D = lazy(() => import('./components/Timeline3D'))
 
@@ -140,6 +143,26 @@ function App() {
         }
     }, [formData]);
 
+    // AI Report State
+    const [isReportOpen, setIsReportOpen] = useState(false);
+    const [reportContent, setReportContent] = useState('');
+    const [isReportLoading, setIsReportLoading] = useState(false);
+    const [reportError, setReportError] = useState(null);
+
+    const handleGenerateReport = async () => {
+        setIsReportOpen(true);
+        setIsReportLoading(true);
+        setReportError(null);
+        try {
+            const content = await generateDetailedReport(formData, analysis, timelineEvents);
+            setReportContent(content);
+        } catch (err) {
+            setReportError(err.message);
+        } finally {
+            setIsReportLoading(false);
+        }
+    };
+
     useEffect(() => {
         localStorage.setItem('caq_timeline_events', JSON.stringify(timelineEvents));
         if (timelineEvents.length > 0) setHasStarted(true);
@@ -166,25 +189,30 @@ function App() {
         setFormData(prev => {
             const next = { ...prev, [name]: val };
 
-            // Logic Coherence: If Primary study level, ensure category is MINEUR
-            if (name === 'studyLevel' && val === 'Primaire' && prev.category.startsWith('MAJ')) {
-                next.category = prev.category.replace('MAJEUR', 'MINEUR');
-            }
-
-            // Logic Coherence: Sync Category with Age (DOB)
-            if (name === 'dob' && val) {
-                const birthDate = new Date(val);
+            // Age calculation helper
+            const calculateAge = (dob) => {
+                if (!dob) return null;
+                const birthDate = new Date(dob);
                 const today = new Date();
                 let age = today.getFullYear() - birthDate.getFullYear();
                 const m = today.getMonth() - birthDate.getMonth();
                 if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
                     age--;
                 }
+                return age;
+            };
 
-                if (age < 17 && prev.category.startsWith('MAJ')) {
-                    next.category = prev.category.replace('MAJEUR', 'MINEUR');
-                } else if (age >= 17 && prev.category.startsWith('MIN')) {
-                    next.category = prev.category.replace('MINEUR', 'MAJEUR');
+            const currentAge = calculateAge(next.dob);
+            const isAdult = currentAge !== null ? currentAge >= 17 : true; // Default to adult if no DOB
+
+            // Logic Coherence: Sync Level, Age and Category
+            if (name === 'studyLevel' || name === 'dob') {
+                const shouldBeMinor = next.studyLevel === 'Primaire' || !isAdult;
+
+                if (shouldBeMinor && next.category.startsWith('MAJ')) {
+                    next.category = next.category.replace('MAJEUR', 'MINEUR');
+                } else if (!shouldBeMinor && next.category.startsWith('MIN')) {
+                    next.category = next.category.replace('MINEUR', 'MAJEUR');
                 }
             }
 
@@ -195,13 +223,11 @@ function App() {
     const handleCategoryChange = (e) => {
         const cat = e.target.value;
         const isMinor = cat.startsWith('MIN');
-        const isRenewal = cat.includes('Renouvellement');
         const isConditional = cat.includes('Exemption');
 
         setFormData(prev => ({
             ...prev,
             category: cat,
-            applicationType: isRenewal ? 'Renouvellement' : 'Première demande',
             isConditional: isConditional,
             // Only update DOB if empty or incompatible
             dob: prev.dob ? prev.dob : (isMinor ? '2015-01-01' : '2000-01-01')
@@ -259,6 +285,21 @@ function App() {
     const timelineStatusLabel = timelineAnalysis?.isEmpty ? 'Aucune donnee' : (timelineAnalysis?.globalStatus || '-');
     const timelineScore = timelineAnalysis?.isEmpty ? 0 : timelineAnalysis.score;
     const timelineIssuesCount = (timelineAnalysis?.controls?.length || 0) + (timelineAnalysis?.insuranceIssues?.length || 0);
+
+    // Strict filtering logic for categories
+    const birthDate = formData.dob ? new Date(formData.dob) : null;
+    let effectiveAge = null;
+    if (birthDate) {
+        const today = new Date();
+        effectiveAge = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            effectiveAge--;
+        }
+    }
+    const isActuallyAdult = effectiveAge !== null ? effectiveAge >= 17 : true;
+    const showMajeurOptions = formData.studyLevel !== 'Primaire' && isActuallyAdult;
+    const showMineurOptions = formData.studyLevel === 'Primaire' || !isActuallyAdult;
 
     return (
         <div className="app-container">
@@ -327,9 +368,61 @@ function App() {
                                         </button>
                                     </div>
                                 </div>
-                                <div className="form-group" style={{ borderBottom: '1px solid #edf2f7', paddingBottom: '1.5rem' }}>
-                                    <label className="text-accent-bold">1. Niveau d'études projeté</label>
-                                    <select name="studyLevel" value={formData.studyLevel} onChange={handleInputChange} className="category-select" style={{ borderColor: 'var(--accent)', borderWidth: '2px' }}>
+                                <div className="form-group" style={{ borderBottom: '1px solid #edf2f7', paddingBottom: '1rem' }}>
+                                    <label className="text-accent-bold">1. Type de demande</label>
+                                    <div className="segmented-control" style={{ marginTop: '0.5rem' }}>
+                                        <label className={`segment ${formData.applicationType === 'Première demande' ? 'active' : ''}`} style={{ flex: 1, textAlign: 'center' }}>
+                                            <input
+                                                type="radio"
+                                                name="applicationType"
+                                                value="Première demande"
+                                                checked={formData.applicationType === 'Première demande'}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setFormData(prev => {
+                                                        const isMinor = prev.category.startsWith('MIN');
+                                                        const isExemption = prev.category.includes('Exemption');
+                                                        const base = isMinor ? 'MINEUR' : 'MAJEUR';
+                                                        const financeStr = isExemption ? '(Exemption financière)' : '(Finance à vérifier)';
+                                                        return {
+                                                            ...prev,
+                                                            applicationType: val,
+                                                            category: `${base} Première demande ${financeStr}`
+                                                        };
+                                                    });
+                                                }}
+                                            />
+                                            Première demande de CAQ
+                                        </label>
+                                        <label className={`segment ${formData.applicationType === 'Renouvellement' ? 'active' : ''}`} style={{ flex: 1, textAlign: 'center' }}>
+                                            <input
+                                                type="radio"
+                                                name="applicationType"
+                                                value="Renouvellement"
+                                                checked={formData.applicationType === 'Renouvellement'}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setFormData(prev => {
+                                                        const isMinor = prev.category.startsWith('MIN');
+                                                        const isExemption = prev.category.includes('Exemption');
+                                                        const base = isMinor ? 'MINEUR' : 'MAJEUR';
+                                                        const financeStr = isExemption ? '(Exemption financière)' : '(Finance à vérifier)';
+                                                        return {
+                                                            ...prev,
+                                                            applicationType: val,
+                                                            category: `${base} Renouvellement ${financeStr}`
+                                                        };
+                                                    });
+                                                }}
+                                            />
+                                            Renouvellement de CAQ
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="form-group" style={{ borderBottom: '1px solid #edf2f7', paddingBottom: '1rem' }}>
+                                    <label>2. Niveau d'études projeté</label>
+                                    <select name="studyLevel" value={formData.studyLevel} onChange={handleInputChange} className="category-select">
                                         <option value="Primaire">Primaire</option>
                                         <option value="Professionnel">Professionnel</option>
                                         <option value="Collégial">Collégial</option>
@@ -339,25 +432,37 @@ function App() {
 
                                 <div className="form-group">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <label style={{ margin: 0 }}>2. Catégorie de Dossier (GPI)</label>
+                                        <label style={{ margin: 0 }}>3. Catégorie de Dossier (GPI)</label>
                                         <span className="tooltip-trigger" data-tooltip="La mention 'Finance à vérifier' dépend du territoire de résidence (MIFI vs Fédéral). Les dossiers avec la mention 'Exemption financière' seront analysés par le Fédéral.">
                                             <Info size={14} className="hint-icon" />
                                         </span>
                                     </div>
 
                                     <select name="category" value={formData.category} onChange={handleCategoryChange} className="category-select">
-                                        {formData.studyLevel !== 'Primaire' && (
+                                        {showMajeurOptions && formData.applicationType === 'Première demande' && (
                                             <>
                                                 <option value="MAJEUR Première demande (Finance à vérifier)">MAJEUR Première demande (Finance à vérifier)</option>
-                                                <option value="MAJEUR Renouvellement (Finance à vérifier)">MAJEUR Renouvellement (Finance à vérifier)</option>
                                                 <option value="MAJEUR Première demande (Exemption financière)">MAJEUR Première demande (Exemption financière)</option>
+                                            </>
+                                        )}
+                                        {showMajeurOptions && formData.applicationType === 'Renouvellement' && (
+                                            <>
+                                                <option value="MAJEUR Renouvellement (Finance à vérifier)">MAJEUR Renouvellement (Finance à vérifier)</option>
                                                 <option value="MAJEUR Renouvellement (Exemption financière)">MAJEUR Renouvellement (Exemption financière)</option>
                                             </>
                                         )}
-                                        <option value="MINEUR Première demande (Finance à vérifier)">MINEUR Première demande (Finance à vérifier)</option>
-                                        <option value="MINEUR Renouvellement (Finance à vérifier)">MINEUR Renouvellement (Finance à vérifier)</option>
-                                        <option value="MINEUR Première demande (Exemption financière)">MINEUR Première demande (Exemption financière)</option>
-                                        <option value="MINEUR Renouvellement (Exemption financière)">MINEUR Renouvellement (Exemption financière)</option>
+                                        {showMineurOptions && formData.applicationType === 'Première demande' && (
+                                            <>
+                                                <option value="MINEUR Première demande (Finance à vérifier)">MINEUR Première demande (Finance à vérifier)</option>
+                                                <option value="MINEUR Première demande (Exemption financière)">MINEUR Première demande (Exemption financière)</option>
+                                            </>
+                                        )}
+                                        {showMineurOptions && formData.applicationType === 'Renouvellement' && (
+                                            <>
+                                                <option value="MINEUR Renouvellement (Finance à vérifier)">MINEUR Renouvellement (Finance à vérifier)</option>
+                                                <option value="MINEUR Renouvellement (Exemption financière)">MINEUR Renouvellement (Exemption financière)</option>
+                                            </>
+                                        )}
                                     </select>
                                 </div>
 
@@ -370,12 +475,6 @@ function App() {
                                         <label>Date de naissance</label>
                                         <input type="date" name="dob" value={formData.dob} onChange={handleInputChange} />
                                         <span className="input-hint">{analysis.isAdult ? 'Candidat Majeur' : 'Candidat Mineur'}</span>
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Type de Demande (Déduit)</label>
-                                        <div className="info-box-styled" style={{ border: '2px solid #e2e8f0', background: '#f8fafc', padding: '0.8rem', borderRadius: '12px', fontWeight: 700, textAlign: 'center' }}>
-                                            {formData.applicationType}
-                                        </div>
                                     </div>
                                 </div>
                                 <div className="form-row">
@@ -1107,27 +1206,40 @@ function App() {
                                 ) : (
                                     <div className="column" style={{ gridColumn: '1 / -1' }}>
                                         <section className="card res-card mode-header-pathway">
-                                            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                                 <h2 style={{ color: 'inherit', margin: 0 }}>Rapport de Reconstitution Chronologique (Parcours)</h2>
-                                                <button
-                                                    className="btn-small"
-                                                    onClick={() => setShow3DTimeline(true)}
-                                                    disabled={!timelineEvents || timelineEvents.length === 0}
-                                                    title={(!timelineEvents || timelineEvents.length === 0) ? "Ajoutez des événements pour visualiser la 3D" : "Voir en 3D"}
-                                                    style={{
-                                                        background: 'var(--primary)',
-                                                        color: 'white',
-                                                        border: 'none',
-                                                        borderRadius: '8px',
-                                                        padding: '6px 12px',
-                                                        fontSize: '0.8rem',
-                                                        fontWeight: 600,
-                                                        opacity: (!timelineEvents || timelineEvents.length === 0) ? 0.5 : 1,
-                                                        cursor: (!timelineEvents || timelineEvents.length === 0) ? 'not-allowed' : 'pointer'
-                                                    }}
-                                                >
-                                                    👁️ Visionner en 3D
-                                                </button>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button
+                                                        onClick={handleGenerateReport}
+                                                        className="btn-primary"
+                                                        style={{
+                                                            background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+                                                            fontSize: '0.8rem',
+                                                            padding: '6px 12px'
+                                                        }}
+                                                    >
+                                                        <FileText size={16} /> Rapport Narratif
+                                                    </button>
+                                                    <button
+                                                        className="btn-small"
+                                                        onClick={() => setShow3DTimeline(true)}
+                                                        disabled={!timelineEvents || timelineEvents.length === 0}
+                                                        title={(!timelineEvents || timelineEvents.length === 0) ? "Ajoutez des événements pour visualiser la 3D" : "Voir en 3D"}
+                                                        style={{
+                                                            background: 'var(--primary)',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            borderRadius: '8px',
+                                                            padding: '6px 12px',
+                                                            fontSize: '0.8rem',
+                                                            fontWeight: 600,
+                                                            opacity: (!timelineEvents || timelineEvents.length === 0) ? 0.5 : 1,
+                                                            cursor: (!timelineEvents || timelineEvents.length === 0) ? 'not-allowed' : 'pointer'
+                                                        }}
+                                                    >
+                                                        👁️ Visionner en 3D
+                                                    </button>
+                                                </div>
                                             </div>
                                             <Timeline
                                                 customEvents={timelineEvents}
@@ -1215,13 +1327,29 @@ function App() {
                                     Modifier les données
                                 </button>
                                 <button className="btn-primary" onClick={() => window.print()}>
-                                    <ClipboardCheck size={18} /> Générer Rapport PDF
+                                    <Printer size={18} /> Imprimer Rapport PDF
+                                </button>
+                                <button
+                                    className="btn-primary"
+                                    onClick={handleGenerateReport}
+                                    style={{ background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)' }}
+                                >
+                                    <FileText size={18} /> Rapport détaillé (IA)
                                 </button>
                             </div>
                         </div>
                     )
                 )}
             </main >
+
+            {/* AI Detailed Report Modal */}
+            <DetailedReportModal
+                isOpen={isReportOpen}
+                onClose={() => setIsReportOpen(false)}
+                content={reportContent}
+                isLoading={isReportLoading}
+                error={reportError}
+            />
 
             {show3DTimeline && (
                 <ErrorBoundary onBack={() => setShow3DTimeline(false)}>
