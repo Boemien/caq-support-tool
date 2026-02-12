@@ -2,14 +2,6 @@ import React, { useState } from 'react';
 import { Plus, Trash2, Clock, Scale, History, GraduationCap } from 'lucide-react';
 
 const EVENT_TYPES = [
-    // ACTES ADMINISTRATIFS & DÉCISIONS
-    { value: 'CAQ_REFUSAL', label: '⛔ Refus de CAQ', ref: 'Art. 11/13 RIQ', category: 'ADM' },
-    { value: 'INTENT_REFUSAL', label: '⚠️ Intention de Refus', ref: 'GPI 3.2', category: 'ADM' },
-    { value: 'INTENT_CANCEL', label: '🚨 Intention d\'Annulation', ref: 'Art. 59 LIQ', category: 'ADM' },
-    { value: 'CAQ_CANCEL', label: '🚫 Annulation du CAQ', ref: 'Art. 59 LIQ', category: 'ADM' },
-    { value: 'FRAUD_REJECTION', label: '⚖️ Rejet pour Faux et Trompeur', ref: 'Art. 56-57 LIQ', category: 'ADM' },
-    { value: 'INTERVIEW', label: '🗣️ Convocation Entrevue', ref: 'Art. 55 LIQ', category: 'ADM' },
-
     // PARCOURS & VIE DU CANDIDAT
     { value: 'CAQ', label: '📜 Certificat (CAQ)', ref: 'Art. 13 RIQ', category: 'USR' },
     { value: 'WORK_PERMIT', label: '🪪 Permis de Travail/Études', ref: '', category: 'USR' },
@@ -20,6 +12,14 @@ const EVENT_TYPES = [
     { value: 'EXIT', label: '🛫 Sortie du territoire', ref: '', category: 'USR' },
     { value: 'MEDICAL', label: '💊 Maladie / Congé Médical', ref: '', category: 'USR' },
     { value: 'OTHER', label: '📅 Autre Événement', ref: '', category: 'USR' },
+
+    // ACTES ADMINISTRATIFS & DÉCISIONS
+    { value: 'CAQ_REFUSAL', label: '⛔ Refus de CAQ', ref: 'Art. 11/13 RIQ', category: 'ADM' },
+    { value: 'INTENT_REFUSAL', label: '⚠️ Intention de Refus', ref: 'GPI 3.2', category: 'ADM' },
+    { value: 'INTENT_CANCEL', label: '🚨 Intention d\'Annulation', ref: 'Art. 59 LIQ', category: 'ADM' },
+    { value: 'CAQ_CANCEL', label: '🚫 Annulation du CAQ', ref: 'Art. 59 LIQ', category: 'ADM' },
+    { value: 'FRAUD_REJECTION', label: '⚖️ Rejet pour Faux et Trompeur', ref: 'Art. 56-57 LIQ', category: 'ADM' },
+    { value: 'INTERVIEW', label: '🗣️ Convocation Entrevue', ref: 'Art. 55 LIQ', category: 'ADM' },
 ];
 
 const TimelineBuilder = ({ events, setEvents }) => {
@@ -83,11 +83,11 @@ const TimelineBuilder = ({ events, setEvents }) => {
                                 value={newEvent.type}
                                 onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value })}
                             >
-                                <optgroup label="--- ACTES ADMINISTRATIFS & DÉCISIONS ---">
-                                    {EVENT_TYPES.filter(t => t.category === 'ADM').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                                </optgroup>
                                 <optgroup label="--- PARCOURS & VIE DU CANDIDAT ---">
                                     {EVENT_TYPES.filter(t => t.category === 'USR').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                                </optgroup>
+                                <optgroup label="--- ACTES ADMINISTRATIFS & DÉCISIONS ---">
+                                    {EVENT_TYPES.filter(t => t.category === 'ADM').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                                 </optgroup>
                             </select>
                         </div>
