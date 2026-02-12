@@ -80,11 +80,7 @@ const EVENT_COLORS = {
     'WORK_PERMIT': '#3b82f6'         // Blue - Work permit
 };
 
-const toDate = value => {
-    if (!value) return null;
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
-};
+const toDate = value => safeParseDate(value);
 
 const pickLane = event => {
     const directLane = LANE_DEFS.find(lane => lane.types.includes(event.type));
@@ -230,7 +226,23 @@ const Timeline3D = ({ events = [], onBack }) => {
                     dayIndex: Math.max(0, differenceInDays(date, minDate))
                 };
             })
-            .filter(Boolean);
+            .filter(Boolean)
+            .sort((a, b) => a.date - b.date);
+
+        // Assign stacking indices for alerts on same or near dates (within 6 days)
+        let lastDate = null;
+        let currentStackIndex = 0;
+        const PROXIMITY_THRESHOLD_DAYS = 6;
+
+        alerts.forEach(alert => {
+            if (lastDate && Math.abs(differenceInDays(alert.date, lastDate)) <= PROXIMITY_THRESHOLD_DAYS) {
+                currentStackIndex++;
+            } else {
+                currentStackIndex = 0;
+            }
+            alert.stackIndex = currentStackIndex;
+            lastDate = alert.date;
+        });
 
         return { items, minDate, maxDate, totalDays, alerts };
     }, [events]);
@@ -946,8 +958,9 @@ const Timeline3D = ({ events = [], onBack }) => {
                                 position: 'absolute',
                                 left: alert.x,
                                 top: alert.y,
-                                transform: 'translate(-50%, -100%)',
-                                zIndex: 3000 + alert.order,
+                                // Stack upwards: -100% (base) - (index * 110%) to account for gap
+                                transform: `translate(-50%, calc(-100% - ${alert.stackIndex * 115}%))`,
+                                zIndex: 3000 + alert.order + alert.stackIndex,
                                 background: alert.type === 'error' ? 'rgba(220, 38, 38, 0.95)' : 'rgba(217, 119, 6, 0.95)',
                                 color: 'white',
                                 padding: '8px 12px',
