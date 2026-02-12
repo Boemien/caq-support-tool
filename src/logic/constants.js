@@ -30,7 +30,7 @@ export const STUDY_LEVEL = {
 };
 
 export const FINANCIAL_THRESHOLDS = {
-    SINGLE_ADULT: 15478, // Updated for 2025
+    SINGLE_ADULT: 24617, // Updated for 2025
     MINOR: 7739, // Roughly half or as per latest GPI
     TRANSPORTATION: 2000,
     INSTALLATION: 500

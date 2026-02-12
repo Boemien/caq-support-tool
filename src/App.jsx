@@ -1003,7 +1003,7 @@ function App() {
                                             {formData.financeMode === 'calculate' ? (
                                                 <div className="finance-status">
                                                     <div className="summary-item"><span>Disponible:</span> <strong>{formData.availableFunds}$</strong></div>
-                                                    <div className="summary-item"><span>Seuil requis:</span> <strong>{FINANCIAL_THRESHOLDS[formData.studyLevel] || 15478}$</strong></div>
+                                                    <div className="summary-item"><span>Seuil requis:</span> <strong>{FINANCIAL_THRESHOLDS[formData.studyLevel] || 24617}$</strong></div>
                                                     <div className="progress-bar-container" style={{
                                                         height: '12px',
                                                         background: '#edf2f7',
@@ -1013,8 +1013,8 @@ function App() {
                                                     }}>
                                                         <div className="progress-bar" style={{
                                                             height: '100%',
-                                                            width: `${Math.min(100, (formData.availableFunds / (FINANCIAL_THRESHOLDS[formData.studyLevel] || 15478)) * 100)}%`,
-                                                            background: formData.availableFunds >= (FINANCIAL_THRESHOLDS[formData.studyLevel] || 15478) ? '#48bb78' : '#e53e3e',
+                                                            width: `${Math.min(100, (formData.availableFunds / (FINANCIAL_THRESHOLDS[formData.studyLevel] || 24617)) * 100)}%`,
+                                                            background: formData.availableFunds >= (FINANCIAL_THRESHOLDS[formData.studyLevel] || 24617) ? '#48bb78' : '#e53e3e',
                                                             transition: 'width 0.5s ease-out'
                                                         }}></div>
                                                     </div>
