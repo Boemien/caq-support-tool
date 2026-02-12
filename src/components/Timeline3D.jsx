@@ -1,9 +1,23 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { addMonths, addYears, differenceInDays, differenceInMonths, endOfMonth, format, startOfMonth, startOfYear } from 'date-fns';
+import { addMonths, addYears, differenceInDays, differenceInMonths, endOfMonth, format, startOfMonth, startOfYear, isValid } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { History } from 'lucide-react';
+import { History, AlertTriangle } from 'lucide-react';
+import { analyzeTimeline } from '../logic/timelineRules';
+
+const safeParseDate = (dateStr) => {
+    if (!dateStr) return null;
+    if (dateStr instanceof Date) return dateStr;
+    if (typeof dateStr === 'string' && dateStr.includes('-')) {
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+            const [y, m, d] = parts.map(Number);
+            return new Date(y, m - 1, d);
+        }
+    }
+    return new Date(dateStr);
+};
 
 const EVENT_LABELS = {
     CAQ: 'Certificat (CAQ)',
@@ -112,6 +126,7 @@ const Timeline3D = ({ events = [], onBack }) => {
     const [projectedLabels, setProjectedLabels] = useState([]);
     const [projectedRanges, setProjectedRanges] = useState([]);
     const [projectedMarkers, setProjectedMarkers] = useState([]);
+    const [projectedAlerts, setProjectedAlerts] = useState([]);
 
     const timelineData = useMemo(() => {
         const items = events
@@ -202,18 +217,34 @@ const Timeline3D = ({ events = [], onBack }) => {
             });
         });
 
-        return { items, minDate, maxDate, totalDays };
+        const report = analyzeTimeline(events);
+        const alerts = (report.allAlerts || [])
+            .map((alert, idx) => {
+                const date = safeParseDate(alert.date);
+                if (!date || !isValid(date)) return null;
+                return {
+                    id: `alert-${idx}`,
+                    date,
+                    message: alert.message,
+                    type: alert.type,
+                    dayIndex: Math.max(0, differenceInDays(date, minDate))
+                };
+            })
+            .filter(Boolean);
+
+        return { items, minDate, maxDate, totalDays, alerts };
     }, [events]);
 
     useEffect(() => {
         if (!containerRef.current || !canvasRef.current) return undefined;
 
-        const { items, minDate, maxDate, totalDays } = timelineData;
+        const { items, minDate, maxDate, totalDays, alerts } = timelineData;
 
         if (!items.length || !minDate || !maxDate) {
             setProjectedLabels([]);
             setProjectedRanges([]);
             setProjectedMarkers([]);
+            setProjectedAlerts([]);
             return undefined;
         }
 
@@ -481,6 +512,14 @@ const Timeline3D = ({ events = [], onBack }) => {
             }
         });
 
+        const alertTargets = (alerts || []).map(alert => {
+            const z = dateToZ(alert.date);
+            return {
+                ...alert,
+                position: new THREE.Vector3(0, 4.5, z) // Float above the center
+            };
+        });
+
         scene.add(pathGroup);
         scene.add(nodesGroup);
 
@@ -536,9 +575,21 @@ const Timeline3D = ({ events = [], onBack }) => {
                 };
             });
 
+            const projectedAlert = alertTargets.map(target => {
+                vector.copy(target.position).project(camera);
+                return {
+                    ...target,
+                    x: (vector.x * 0.5 + 0.5) * currentWidth,
+                    y: (-vector.y * 0.5 + 0.5) * currentHeight,
+                    visible: vector.z > -1 && vector.z < 1,
+                    order: maxOrder - (target.dayIndex ?? 0)
+                };
+            });
+
             setProjectedLabels(projected);
             setProjectedRanges(projectedRange);
             setProjectedMarkers(projectedMarker);
+            setProjectedAlerts(projectedAlert);
         };
 
         const animate = () => {
@@ -559,23 +610,30 @@ const Timeline3D = ({ events = [], onBack }) => {
         window.addEventListener('resize', handleResize);
 
         const handleKeyDown = (e) => {
-            const moveStep = 2.0; // Adjust for movement speed
+            const moveStep = 2.5;
+            let xDelta = 0;
             let zDelta = 0;
 
             switch (e.key) {
                 case 'ArrowUp':
-                case 'ArrowRight':
                     zDelta = -moveStep;
                     break;
                 case 'ArrowDown':
-                case 'ArrowLeft':
                     zDelta = moveStep;
+                    break;
+                case 'ArrowLeft':
+                    xDelta = -moveStep;
+                    break;
+                case 'ArrowRight':
+                    xDelta = moveStep;
                     break;
                 default:
                     return;
             }
 
+            camera.position.x += xDelta;
             camera.position.z += zDelta;
+            controls.target.x += xDelta;
             controls.target.z += zDelta;
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -880,6 +938,37 @@ const Timeline3D = ({ events = [], onBack }) => {
                         </div>
                     );
                 })}
+                {projectedAlerts.map(alert => (
+                    alert.visible && (
+                        <div
+                            key={alert.id}
+                            style={{
+                                position: 'absolute',
+                                left: alert.x,
+                                top: alert.y,
+                                transform: 'translate(-50%, -100%)',
+                                zIndex: 3000 + alert.order,
+                                background: alert.type === 'error' ? 'rgba(220, 38, 38, 0.95)' : 'rgba(217, 119, 6, 0.95)',
+                                color: 'white',
+                                padding: '8px 12px',
+                                borderRadius: '10px',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+                                pointerEvents: 'auto',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                minWidth: '220px',
+                                maxWidth: '300px'
+                            }}
+                        >
+                            <AlertTriangle size={16} />
+                            <div style={{ fontSize: '11px', fontWeight: 600, lineHeight: '1.4' }}>
+                                {alert.message}
+                            </div>
+                        </div>
+                    )
+                ))}
             </div>
 
             <div
@@ -899,7 +988,7 @@ const Timeline3D = ({ events = [], onBack }) => {
                 }}
             >
                 <History size={14} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-                Timeline multidimensionnelle • Molette = Zoom • Glisser = Rotation
+                Timeline multidimensionnelle • Flèches = Décalage Caméra • Molette = Zoom • Glisser = Rotation
             </div>
         </div>
     );
