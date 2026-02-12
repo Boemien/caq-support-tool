@@ -557,8 +557,31 @@ const Timeline3D = ({ events = [], onBack }) => {
         };
         window.addEventListener('resize', handleResize);
 
+        const handleKeyDown = (e) => {
+            const moveStep = 2.0; // Adjust for movement speed
+            let zDelta = 0;
+
+            switch (e.key) {
+                case 'ArrowUp':
+                case 'ArrowRight':
+                    zDelta = -moveStep;
+                    break;
+                case 'ArrowDown':
+                case 'ArrowLeft':
+                    zDelta = moveStep;
+                    break;
+                default:
+                    return;
+            }
+
+            camera.position.z += zDelta;
+            controls.target.z += zDelta;
+        };
+        window.addEventListener('keydown', handleKeyDown);
+
         return () => {
             window.removeEventListener('resize', handleResize);
+            window.removeEventListener('keydown', handleKeyDown);
             cancelAnimationFrame(requestRef.current);
             renderer.dispose();
             grid.geometry.dispose();
