@@ -20,7 +20,7 @@ const EVENT_LABELS = {
     'MEDICAL': 'Maladie / Congé Médical'
 };
 
-const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgram, customEvents = [] }) => {
+const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgram, customEvents = [], hideEmptyMessage = false }) => {
     // Calculer la plage globale
     // Priorise les paramètres explicites (startDate/endDate), sinon utilise tous les événements disponibles
     let minDate, maxDate;
@@ -62,6 +62,7 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
     const getWidth = (s, e) => (differenceInDays(new Date(e), new Date(s)) / totalDays) * 100;
 
     if (isEmpty) {
+        if (hideEmptyMessage) return null;
         return (
             <div className="timeline-widget empty-placeholder" style={{
                 height: '200px',

@@ -60,13 +60,15 @@ export function analyzeDossier(data) {
     });
 
     // Dynamic Admission / Attestation Requirement
+    const isFirstApplication = data.applicationType === APPLICATION_TYPE.FIRST;
     const isNewProgram = data.isNewProgram === true; // Strict check
-    const admissionLabel = isNewProgram
+
+    const admissionLabel = (isFirstApplication || isNewProgram)
         ? "Lettre d'admission (Nouveau programme)"
         : "Attestation de fréquentation (Programme actuel)";
 
-    const admissionNote = isNewProgram
-        ? "Obligatoire : Vous débutez un nouveau programme. Une lettre d'admission complète est requise."
+    const admissionNote = (isFirstApplication || isNewProgram)
+        ? "Obligatoire : Vous débutez un nouveau programme ou il s'agit d'une première demande. Une lettre d'admission complète est requise."
         : "Obligatoire : Vous poursuivez votre programme actuel. Une attestation de fréquentation récente est requise.";
 
     controls.push({

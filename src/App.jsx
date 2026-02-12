@@ -3,12 +3,12 @@ import {
     FileText, User, GraduationCap, Users, ShieldAlert,
     CheckCircle2, History, Timer, AlertTriangle, Info,
     DollarSign, ClipboardCheck, ArrowRight, RotateCcw,
-    Printer
+    Printer, X, Copy, Loader2, AlertCircle
 } from 'lucide-react'
 import { analyzeDossier } from './logic/ruleEngine'
 import { analyzeTimeline, TIMELINE_STATUS } from './logic/timelineRules'
-import { generateDetailedReport } from './services/geminiService'
-import { STATUS, SEVERITY, RECOMMENDATION, FINANCE_MIFI_COUNTRIES } from './logic/constants'
+import { generateDossierReport, generateChronologyReport } from './services/geminiService'
+import { STATUS, SEVERITY, RECOMMENDATION, FINANCE_MIFI_COUNTRIES, FINANCIAL_THRESHOLDS } from './logic/constants'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 
@@ -116,6 +116,8 @@ function App() {
     const [showResetModal, setShowResetModal] = useState(false)
     const [show3DTimeline, setShow3DTimeline] = useState(false)
     const [hasStarted, setHasStarted] = useState(false)
+    const [showDossierResults, setShowDossierResults] = useState(false)
+    const [showChronologyResults, setShowChronologyResults] = useState(false)
 
     const analysis = useMemo(() => analyzeDossier(formData), [formData])
     const timelineAnalysis = useMemo(() => analyzeTimeline(timelineEvents), [timelineEvents])
@@ -149,12 +151,17 @@ function App() {
     const [isReportLoading, setIsReportLoading] = useState(false);
     const [reportError, setReportError] = useState(null);
 
-    const handleGenerateReport = async () => {
+    const handleGenerateReport = async (type = 'dossier') => {
         setIsReportOpen(true);
         setIsReportLoading(true);
         setReportError(null);
         try {
-            const content = await generateDetailedReport(formData, analysis, timelineEvents);
+            let content = '';
+            if (type === 'chronology') {
+                content = await generateChronologyReport({}, timelineEvents);
+            } else {
+                content = await generateDossierReport(formData, analysis);
+            }
             setReportContent(content);
         } catch (err) {
             setReportError(err.message);
@@ -316,19 +323,13 @@ function App() {
                         className={`nav-item mode-dossier ${activeTab === 'input' ? 'active' : ''}`}
                         onClick={() => setActiveTab('input')}
                     >
-                        <FileText size={18} /> 1. Analyse du Dossier
+                        <FileText size={18} /> 1. Dossier (Diagnostic)
                     </button>
                     <button
                         className={`nav-item mode-pathway ${activeTab === 'chronology' ? 'active' : ''}`}
                         onClick={() => setActiveTab('chronology')}
                     >
-                        <History size={18} /> 2. Reconstitution Chronologique
-                    </button>
-                    <button
-                        className={`nav-item mode-report ${activeTab === 'analysis' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('analysis')}
-                    >
-                        <ShieldAlert size={18} /> 3. Rapport Final
+                        <History size={18} /> 2. Chronologie (Audit)
                     </button>
                 </nav>
             </header>
@@ -336,15 +337,19 @@ function App() {
             <main>
                 {activeTab === 'input' ? (
                     <div className="input-layout fade-in">
-                        <div style={{ gridColumn: '1 / -1', marginBottom: '2rem', background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+                        <div className="no-print" style={{ gridColumn: '1 / -1', marginBottom: '2rem', background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
                                 <div style={{ background: 'rgb(235, 248, 255)', padding: '10px', borderRadius: '12px' }}>
                                     <FileText size={24} color="#3182ce" />
                                 </div>
                                 <div>
-                                    <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#2d3748' }}>Analyse d'admissibilité du CAQ</h2>
+                                    <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#2d3748' }}>
+                                        {showDossierResults ? "Résultats du Diagnostic" : "Analyse d'admissibilité du CAQ"}
+                                    </h2>
                                     <p style={{ margin: '4px 0 0', color: '#718096', fontSize: '0.95rem' }}>
-                                        Simulateur professionnel pour évaluer la conformité d'un dossier avant soumission au MIFI.
+                                        {showDossierResults
+                                            ? "Synthèse détaillée des points de non-conformité et recommandations."
+                                            : "Simulateur professionnel pour évaluer la conformité d'un dossier avant soumission au MIFI."}
                                     </p>
                                 </div>
                                 <div className="footer-disclaimer">
@@ -353,625 +358,701 @@ function App() {
                                 </div>
                             </div>
                         </div>
-                        <div className="form-column">
 
-                            {/* 1. Saisie & Analyse Individuelle */}
-                            <section className="card form-card mode-header-dossier">
-                                <div className="card-header">
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <User size={18} />
-                                            <h2>Saisie & Analyse Individuelle</h2>
-                                        </div>
-                                        <button className="btn-small reset-btn" onClick={handleReset} title="Tout effacer">
-                                            <RotateCcw size={14} /> Réinitialiser
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="form-group" style={{ borderBottom: '1px solid #edf2f7', paddingBottom: '1rem' }}>
-                                    <label className="text-accent-bold">1. Type de demande</label>
-                                    <div className="segmented-control" style={{ marginTop: '0.5rem' }}>
-                                        <label className={`segment ${formData.applicationType === 'Première demande' ? 'active' : ''}`} style={{ flex: 1, textAlign: 'center' }}>
-                                            <input
-                                                type="radio"
-                                                name="applicationType"
-                                                value="Première demande"
-                                                checked={formData.applicationType === 'Première demande'}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setFormData(prev => {
-                                                        const isMinor = prev.category.startsWith('MIN');
-                                                        const isExemption = prev.category.includes('Exemption');
-                                                        const base = isMinor ? 'MINEUR' : 'MAJEUR';
-                                                        const financeStr = isExemption ? '(Exemption financière)' : '(Finance à vérifier)';
-                                                        return {
-                                                            ...prev,
-                                                            applicationType: val,
-                                                            category: `${base} Première demande ${financeStr}`
-                                                        };
-                                                    });
-                                                }}
-                                            />
-                                            Première demande de CAQ
-                                        </label>
-                                        <label className={`segment ${formData.applicationType === 'Renouvellement' ? 'active' : ''}`} style={{ flex: 1, textAlign: 'center' }}>
-                                            <input
-                                                type="radio"
-                                                name="applicationType"
-                                                value="Renouvellement"
-                                                checked={formData.applicationType === 'Renouvellement'}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setFormData(prev => {
-                                                        const isMinor = prev.category.startsWith('MIN');
-                                                        const isExemption = prev.category.includes('Exemption');
-                                                        const base = isMinor ? 'MINEUR' : 'MAJEUR';
-                                                        const financeStr = isExemption ? '(Exemption financière)' : '(Finance à vérifier)';
-                                                        return {
-                                                            ...prev,
-                                                            applicationType: val,
-                                                            category: `${base} Renouvellement ${financeStr}`
-                                                        };
-                                                    });
-                                                }}
-                                            />
-                                            Renouvellement de CAQ
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div className="form-group" style={{ borderBottom: '1px solid #edf2f7', paddingBottom: '1rem' }}>
-                                    <label>2. Niveau d'études projeté</label>
-                                    <select name="studyLevel" value={formData.studyLevel} onChange={handleInputChange} className="category-select">
-                                        <option value="Primaire">Primaire</option>
-                                        <option value="Professionnel">Professionnel</option>
-                                        <option value="Collégial">Collégial</option>
-                                        <option value="Universitaire">Universitaire</option>
-                                    </select>
-                                </div>
-
-                                <div className="form-group">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <label style={{ margin: 0 }}>3. Catégorie de Dossier (GPI)</label>
-                                        <span className="tooltip-trigger" data-tooltip="La mention 'Finance à vérifier' dépend du territoire de résidence (MIFI vs Fédéral). Les dossiers avec la mention 'Exemption financière' seront analysés par le Fédéral.">
-                                            <Info size={14} className="hint-icon" />
-                                        </span>
-                                    </div>
-
-                                    <select name="category" value={formData.category} onChange={handleCategoryChange} className="category-select">
-                                        {showMajeurOptions && formData.applicationType === 'Première demande' && (
-                                            <>
-                                                <option value="MAJEUR Première demande (Finance à vérifier)">MAJEUR Première demande (Finance à vérifier)</option>
-                                                <option value="MAJEUR Première demande (Exemption financière)">MAJEUR Première demande (Exemption financière)</option>
-                                            </>
-                                        )}
-                                        {showMajeurOptions && formData.applicationType === 'Renouvellement' && (
-                                            <>
-                                                <option value="MAJEUR Renouvellement (Finance à vérifier)">MAJEUR Renouvellement (Finance à vérifier)</option>
-                                                <option value="MAJEUR Renouvellement (Exemption financière)">MAJEUR Renouvellement (Exemption financière)</option>
-                                            </>
-                                        )}
-                                        {showMineurOptions && formData.applicationType === 'Première demande' && (
-                                            <>
-                                                <option value="MINEUR Première demande (Finance à vérifier)">MINEUR Première demande (Finance à vérifier)</option>
-                                                <option value="MINEUR Première demande (Exemption financière)">MINEUR Première demande (Exemption financière)</option>
-                                            </>
-                                        )}
-                                        {showMineurOptions && formData.applicationType === 'Renouvellement' && (
-                                            <>
-                                                <option value="MINEUR Renouvellement (Finance à vérifier)">MINEUR Renouvellement (Finance à vérifier)</option>
-                                                <option value="MINEUR Renouvellement (Exemption financière)">MINEUR Renouvellement (Exemption financière)</option>
-                                            </>
-                                        )}
-                                    </select>
-                                </div>
-
-                                <div className="form-group">
-                                    <label>Numéro de dossier</label>
-                                    <input name="fileNumber" value={formData.fileNumber} onChange={handleInputChange} placeholder="Ex: 1234567" />
-                                </div>
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        <label>Date de naissance</label>
-                                        <input type="date" name="dob" value={formData.dob} onChange={handleInputChange} />
-                                        <span className="input-hint">{analysis.isAdult ? 'Candidat Majeur' : 'Candidat Mineur'}</span>
-                                    </div>
-                                </div>
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        {formData.country && (
-                                            <div className="advice-box fade-in" style={{
-                                                background: '#f0fff4',
-                                                border: '1px solid #68d391',
-                                                color: '#22543d',
-                                                padding: '0.8rem',
-                                                borderRadius: '8px',
-                                                marginBottom: '0.8rem',
-                                                fontSize: '0.85rem'
-                                            }}>
-                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                                                    <Info size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
-                                                    <div>
-                                                        {FINANCE_MIFI_COUNTRIES.some(c => c.toLowerCase() === formData.country.trim().toLowerCase()) ? (
-                                                            <strong>Conseil : Vous résidez dans un territoire qui necessite une vérification de vos preuves financières par le MIFI. Sélectionnez une catégorie "Finance à vérifier".</strong>
-                                                        ) : (
-                                                            <strong>Conseil : Vous résidez dans un territoire qui ne necessite pas une vérification de vos preuves financières par le MIFI mais vous devez fournir des preuves financières au fédéral. Sélectionnez une catégorie "Exemption financière".</strong>
-                                                        )}
-                                                        <div style={{ marginTop: '4px', opacity: 0.8 }}>
-                                                            En cas de doute, choisir "Finance à vérifier" permet une analyse complète de vos preuves financières.
-                                                        </div>
-                                                    </div>
+                        {!showDossierResults ? (
+                            <>
+                                {/* Left Column Cards */}
+                                <div className="form-column">
+                                    {/* 1. Saisie & Analyse Individuelle */}
+                                    <section className="card form-card mode-header-dossier">
+                                        <div className="card-header">
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <User size={18} />
+                                                    <h2>Saisie & Analyse Individuelle</h2>
                                                 </div>
-                                            </div>
-                                        )}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <label style={{ margin: 0 }}>Pays de résidence habituelle</label>
-                                        </div>
-                                        <input
-                                            name="country"
-                                            value={formData.country}
-                                            onChange={handleInputChange}
-                                            placeholder="Ex: France, Sénégal..."
-                                        />
-                                    </div>
-                                </div>
-                            </section>
-
-                            {/* 2. Projet d'Études (DLI) */}
-                            <section className="card form-card">
-                                <div className="card-header">
-                                    <GraduationCap size={18} />
-                                    <h2>Projet d'Études (DLI)</h2>
-                                </div>
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        <label>Début du programme</label>
-                                        <input type="date" name="startDate" value={formData.startDate} onChange={handleInputChange} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Fin du programme</label>
-                                        <input type="date" name="endDate" value={formData.endDate} onChange={handleInputChange} />
-                                    </div>
-                                </div>
-
-                                {formData.applicationType === 'Renouvellement' && (
-                                    <div className="sub-section fade-in">
-                                        <h3>Dates du CAQ Précédent</h3>
-                                        <div className="form-row">
-                                            <div className="form-group">
-                                                <label>Début CAQ précédent</label>
-                                                <input type="date" name="prevCAQStart" value={formData.prevCAQStart} onChange={handleInputChange} />
-                                            </div>
-                                            <div className="form-group">
-                                                <label>Fin CAQ précédent</label>
-                                                <input type="date" name="prevCAQEnd" value={formData.prevCAQEnd} onChange={handleInputChange} />
+                                                <button className="btn-small reset-btn" onClick={handleReset} title="Tout effacer">
+                                                    <RotateCcw size={14} /> Réinitialiser
+                                                </button>
                                             </div>
                                         </div>
-                                        <div className="form-row" style={{ marginTop: '0.5rem' }}>
-                                            <div className="form-group">
-                                                <label>Début études précédentes</label>
-                                                <input type="date" name="prevStudyStart" value={formData.prevStudyStart} onChange={handleInputChange} />
-                                            </div>
-                                            <div className="form-group" style={{ position: 'relative' }}>
-                                                <label>Fin études précédentes</label>
-                                                <input
-                                                    type="date"
-                                                    name="prevStudyEnd"
-                                                    value={formData.prevStudyEnd}
-                                                    onChange={handleInputChange}
-                                                    disabled={formData.prevStudyInProgress}
-                                                    style={{ opacity: formData.prevStudyInProgress ? 0.5 : 1 }}
-                                                />
-                                                <label className="checkbox-item" style={{ marginTop: '8px', fontSize: '0.9rem' }}>
+
+                                        <div className="form-group" style={{ borderBottom: '1px solid #edf2f7', paddingBottom: '1rem' }}>
+                                            <label className="text-accent-bold">1. Type de demande</label>
+                                            <div className="segmented-control" style={{ marginTop: '0.5rem' }}>
+                                                <label className={`segment ${formData.applicationType === 'Première demande' ? 'active' : ''}`} style={{ flex: 1, textAlign: 'center' }}>
                                                     <input
-                                                        type="checkbox"
-                                                        name="prevStudyInProgress"
-                                                        checked={formData.prevStudyInProgress}
+                                                        type="radio"
+                                                        name="applicationType"
+                                                        value="Première demande"
+                                                        checked={formData.applicationType === 'Première demande'}
                                                         onChange={(e) => {
-                                                            const checked = e.target.checked;
-                                                            setFormData(prev => ({
-                                                                ...prev,
-                                                                prevStudyInProgress: checked,
-                                                                prevStudyEnd: checked ? '' : prev.prevStudyEnd,
-                                                                isNewProgram: checked ? false : prev.isNewProgram
-                                                            }));
+                                                            const val = e.target.value;
+                                                            setFormData(prev => {
+                                                                const isMinor = prev.category.startsWith('MIN');
+                                                                const isExemption = prev.category.includes('Exemption');
+                                                                const base = isMinor ? 'MINEUR' : 'MAJEUR';
+                                                                const financeStr = isExemption ? '(Exemption financière)' : '(Finance à vérifier)';
+                                                                return {
+                                                                    ...prev,
+                                                                    applicationType: val,
+                                                                    category: `${base} Première demande ${financeStr}`
+                                                                };
+                                                            });
                                                         }}
                                                     />
-                                                    <span>Études toujours en cours</span>
+                                                    Première demande de CAQ
+                                                </label>
+                                                <label className={`segment ${formData.applicationType === 'Renouvellement' ? 'active' : ''}`} style={{ flex: 1, textAlign: 'center' }}>
+                                                    <input
+                                                        type="radio"
+                                                        name="applicationType"
+                                                        value="Renouvellement"
+                                                        checked={formData.applicationType === 'Renouvellement'}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            setFormData(prev => {
+                                                                const isMinor = prev.category.startsWith('MIN');
+                                                                const isExemption = prev.category.includes('Exemption');
+                                                                const base = isMinor ? 'MINEUR' : 'MAJEUR';
+                                                                const financeStr = isExemption ? '(Exemption financière)' : '(Finance à vérifier)';
+                                                                return {
+                                                                    ...prev,
+                                                                    applicationType: val,
+                                                                    category: `${base} Renouvellement ${financeStr}`
+                                                                };
+                                                            });
+                                                        }}
+                                                    />
+                                                    Renouvellement de CAQ
                                                 </label>
                                             </div>
                                         </div>
-                                        <div className="form-row" style={{ marginTop: '0.5rem' }}>
-                                            <div className="form-group">
-                                                <label>Date de première entrée au pays</label>
-                                                <input type="date" name="entryDate" value={formData.entryDate} onChange={handleInputChange} />
+
+                                        <div className="form-group" style={{ borderBottom: '1px solid #edf2f7', paddingBottom: '1rem' }}>
+                                            <label>2. Niveau d'études projeté</label>
+                                            <select name="studyLevel" value={formData.studyLevel} onChange={handleInputChange} className="category-select">
+                                                <option value="Primaire">Primaire</option>
+                                                <option value="Professionnel">Professionnel</option>
+                                                <option value="Collégial">Collégial</option>
+                                                <option value="Universitaire">Universitaire</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <label style={{ margin: 0 }}>3. Catégorie de Dossier (GPI)</label>
+                                                <span className="tooltip-trigger" data-tooltip="La mention 'Finance à vérifier' dépend du territoire de résidence (MIFI vs Fédéral). Les dossiers avec la mention 'Exemption financière' seront analysés par le Fédéral.">
+                                                    <Info size={14} className="hint-icon" />
+                                                </span>
                                             </div>
-                                            <div className="form-group" style={{ marginTop: '1.5rem' }}>
-                                                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Nouveau programme d'études ?</label>
-                                                <div className="segmented-control">
-                                                    <label className={`segment ${formData.isNewProgram === true ? 'active' : ''}`}>
+
+                                            <select name="category" value={formData.category} onChange={handleCategoryChange} className="category-select">
+                                                {showMajeurOptions && formData.applicationType === 'Première demande' && (
+                                                    <>
+                                                        <option value="MAJEUR Première demande (Finance à vérifier)">MAJEUR Première demande (Finance à vérifier)</option>
+                                                        <option value="MAJEUR Première demande (Exemption financière)">MAJEUR Première demande (Exemption financière)</option>
+                                                    </>
+                                                )}
+                                                {showMajeurOptions && formData.applicationType === 'Renouvellement' && (
+                                                    <>
+                                                        <option value="MAJEUR Renouvellement (Finance à vérifier)">MAJEUR Renouvellement (Finance à vérifier)</option>
+                                                        <option value="MAJEUR Renouvellement (Exemption financière)">MAJEUR Renouvellement (Exemption financière)</option>
+                                                    </>
+                                                )}
+                                                {showMineurOptions && formData.applicationType === 'Première demande' && (
+                                                    <>
+                                                        <option value="MINEUR Première demande (Finance à vérifier)">MINEUR Première demande (Finance à vérifier)</option>
+                                                        <option value="MINEUR Première demande (Exemption financière)">MINEUR Première demande (Exemption financière)</option>
+                                                    </>
+                                                )}
+                                                {showMineurOptions && formData.applicationType === 'Renouvellement' && (
+                                                    <>
+                                                        <option value="MINEUR Renouvellement (Finance à vérifier)">MINEUR Renouvellement (Finance à vérifier)</option>
+                                                        <option value="MINEUR Renouvellement (Exemption financière)">MINEUR Renouvellement (Exemption financière)</option>
+                                                    </>
+                                                )}
+                                            </select>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>Numéro de dossier</label>
+                                            <input name="fileNumber" value={formData.fileNumber} onChange={handleInputChange} placeholder="Ex: 1234567" />
+                                        </div>
+                                        <div className="form-row">
+                                            <div className="form-group">
+                                                <label>Date de naissance</label>
+                                                <input type="date" name="dob" value={formData.dob} onChange={handleInputChange} />
+                                                <span className="input-hint">{analysis.isAdult ? 'Candidat Majeur' : 'Candidat Mineur'}</span>
+                                            </div>
+                                        </div>
+                                        <div className="form-row">
+                                            <div className="form-group">
+                                                {formData.country && (
+                                                    <div className="advice-box fade-in" style={{
+                                                        background: '#f0fff4',
+                                                        border: '1px solid #68d391',
+                                                        color: '#22543d',
+                                                        padding: '0.8rem',
+                                                        borderRadius: '8px',
+                                                        marginBottom: '0.8rem',
+                                                        fontSize: '0.85rem'
+                                                    }}>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                                            <Info size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+                                                            <div>
+                                                                {FINANCE_MIFI_COUNTRIES.some(c => c.toLowerCase() === formData.country.trim().toLowerCase()) ? (
+                                                                    <strong>Conseil : Vous résidez dans un territoire qui necessite une vérification de vos preuves financières par le MIFI. Sélectionnez une catégorie "Finance à vérifier".</strong>
+                                                                ) : (
+                                                                    <strong>Conseil : Vous résidez dans un territoire qui ne necessite pas une vérification de vos preuves financières par le MIFI mais vous devez fournir des preuves financières au fédéral. Sélectionnez une catégorie "Exemption financière".</strong>
+                                                                )}
+                                                                <div style={{ marginTop: '4px', opacity: 0.8 }}>
+                                                                    En cas de doute, choisir "Finance à vérifier" permet une analyse complète de vos preuves financières.
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <label style={{ margin: 0 }}>Pays de résidence habituelle</label>
+                                                </div>
+                                                <input
+                                                    name="country"
+                                                    value={formData.country}
+                                                    onChange={handleInputChange}
+                                                    placeholder="Ex: France, Sénégal..."
+                                                />
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    {/* 2. Projet d'Études (DLI) */}
+                                    <section className="card form-card">
+                                        <div className="card-header">
+                                            <GraduationCap size={18} />
+                                            <h2>Projet d'Études (DLI)</h2>
+                                        </div>
+                                        <div className="form-row">
+                                            <div className="form-group">
+                                                <label>Début du programme</label>
+                                                <input type="date" name="startDate" value={formData.startDate} onChange={handleInputChange} />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Fin du programme</label>
+                                                <input type="date" name="endDate" value={formData.endDate} onChange={handleInputChange} />
+                                            </div>
+                                        </div>
+
+                                        {formData.applicationType === 'Renouvellement' && (
+                                            <div className="sub-section fade-in">
+                                                <h3>Dates du CAQ Précédent</h3>
+                                                <div className="form-row">
+                                                    <div className="form-group">
+                                                        <label>Début CAQ précédent</label>
+                                                        <input type="date" name="prevCAQStart" value={formData.prevCAQStart} onChange={handleInputChange} />
+                                                    </div>
+                                                    <div className="form-group">
+                                                        <label>Fin CAQ précédent</label>
+                                                        <input type="date" name="prevCAQEnd" value={formData.prevCAQEnd} onChange={handleInputChange} />
+                                                    </div>
+                                                </div>
+                                                <div className="form-row" style={{ marginTop: '0.5rem' }}>
+                                                    <div className="form-group">
+                                                        <label>Début études précédentes</label>
+                                                        <input type="date" name="prevStudyStart" value={formData.prevStudyStart} onChange={handleInputChange} />
+                                                    </div>
+                                                    <div className="form-group" style={{ position: 'relative' }}>
+                                                        <label>Fin études précédentes</label>
                                                         <input
-                                                            type="radio"
-                                                            name="isNewProgram"
-                                                            value="true"
-                                                            checked={formData.isNewProgram === true}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, isNewProgram: true }))}
+                                                            type="date"
+                                                            name="prevStudyEnd"
+                                                            value={formData.prevStudyEnd}
+                                                            onChange={handleInputChange}
+                                                            disabled={formData.prevStudyInProgress}
+                                                            style={{ opacity: formData.prevStudyInProgress ? 0.5 : 1 }}
                                                         />
-                                                        Oui (Admission)
+                                                        <label className="checkbox-item" style={{ marginTop: '8px', fontSize: '0.9rem' }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                name="prevStudyInProgress"
+                                                                checked={formData.prevStudyInProgress}
+                                                                onChange={(e) => {
+                                                                    const checked = e.target.checked;
+                                                                    setFormData(prev => ({
+                                                                        ...prev,
+                                                                        prevStudyInProgress: checked,
+                                                                        prevStudyEnd: checked ? '' : prev.prevStudyEnd,
+                                                                        isNewProgram: checked ? false : prev.isNewProgram
+                                                                    }));
+                                                                }}
+                                                            />
+                                                            <span>Études toujours en cours</span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                {formData.applicationType === 'Renouvellement' && (
+                                                    <div className="form-row" style={{ marginTop: '0.5rem' }}>
+                                                        <div className="form-group">
+                                                            <label>Date de première entrée au pays</label>
+                                                            <input type="date" name="entryDate" value={formData.entryDate} onChange={handleInputChange} />
+                                                        </div>
+                                                        <div className="form-group" style={{ marginTop: '1.5rem' }}>
+                                                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Nouveau programme d'études ?</label>
+                                                            <div className="segmented-control">
+                                                                <label className={`segment ${formData.isNewProgram === true ? 'active' : ''}`}>
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="isNewProgram"
+                                                                        value="true"
+                                                                        checked={formData.isNewProgram === true}
+                                                                        onChange={(e) => setFormData(prev => ({ ...prev, isNewProgram: true }))}
+                                                                    />
+                                                                    Oui (Admission)
+                                                                </label>
+                                                                <label className={`segment ${formData.isNewProgram === false ? 'active' : ''}`}>
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="isNewProgram"
+                                                                        value="false"
+                                                                        checked={formData.isNewProgram === false}
+                                                                        onChange={(e) => setFormData(prev => ({ ...prev, isNewProgram: false }))}
+                                                                    />
+                                                                    Non (Même programme)
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </section>
+                                </div>
+
+                                <div className="form-column">
+
+                                    {/* 3. Pièces Justificatives */}
+                                    <section className="card form-card">
+                                        <div className="card-header">
+                                            <ClipboardCheck size={18} />
+                                            <h2>Pièces Justificatives</h2>
+                                        </div>
+                                        <div className="checklist-input">
+                                            <label className="checkbox-item">
+                                                <input type="checkbox" name="formDeclaration" checked={formData.formDeclaration} onChange={handleInputChange} />
+                                                <span>Formulaires déclaration et engagement</span>
+                                            </label>
+                                            <label className="checkbox-item">
+                                                <input type="checkbox" name="admissionLetter" checked={formData.admissionLetter} onChange={handleInputChange} />
+                                                <span>
+                                                    {(formData.applicationType === 'Première demande' || formData.isNewProgram)
+                                                        ? "Lettre d'admission (Nouveau programme)"
+                                                        : "Attestation de fréquentation (Programme actuel)"}
+                                                </span>
+                                            </label>
+
+                                            {formData.applicationType === 'Renouvellement' && (
+                                                <div className="sub-section fade-in">
+                                                    <h3>Dossier académique (Post-Secondaire)</h3>
+                                                    <label className="checkbox-item">
+                                                        <input type="checkbox" name="transcripts" checked={formData.transcripts} onChange={handleInputChange} />
+                                                        <span>Tous les relevés de notes (Québec)</span>
                                                     </label>
-                                                    <label className={`segment ${formData.isNewProgram === false ? 'active' : ''}`}>
-                                                        <input
-                                                            type="radio"
-                                                            name="isNewProgram"
-                                                            value="false"
-                                                            checked={formData.isNewProgram === false}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, isNewProgram: false }))}
-                                                        />
-                                                        Non (Même programme)
+                                                    <label className="checkbox-item">
+                                                        <input type="checkbox" name="explanationsStudy" checked={formData.explanationsStudy} onChange={handleInputChange} />
+                                                        <span>Lettre explicative (si échec/abandon)</span>
+                                                    </label>
+                                                    <label className="checkbox-item" style={{ marginTop: '0.5rem', color: '#64748b' }}>
+                                                        <input type="checkbox" name="fullTimeJustification" checked={formData.fullTimeJustification} onChange={handleInputChange} />
+                                                        <span style={{ fontSize: '0.8rem' }}>Justification Études Temps Plein (si applicable)</span>
                                                     </label>
                                                 </div>
+                                            )}
+                                        </div>
+                                    </section>
+
+                                    {/* 4. Protection (Assurance) */}
+                                    <section className="card form-card">
+                                        <div className="card-header">
+                                            <ShieldAlert size={18} />
+                                            <h2>Protection Santé (Art 15)</h2>
+                                        </div>
+                                        <div className="checklist-input">
+                                            <p className="hint">Une preuve de couverture d'assurance maladie et hospitalisation pour toute la durée du séjour est exigée.</p>
+                                            <div className="insurance-manager">
+                                                <h4>Historique des assurances passées</h4>
+                                                {formData.pastInsurances.map((ins, idx) => (
+                                                    <div key={idx} className="insurance-row fade-in">
+                                                        <input type="date" value={ins.start} onChange={(e) => updateInsurance('past', idx, 'start', e.target.value)} />
+                                                        <span>au</span>
+                                                        <input type="date" value={ins.end} onChange={(e) => updateInsurance('past', idx, 'end', e.target.value)} />
+                                                        <button className="btn-icon" onClick={() => removeInsurance('past', idx)}>×</button>
+                                                    </div>
+                                                ))}
+                                                <button className="btn-secondary btn-small" onClick={() => addInsurance('past')}>+ Ajouter une période passée</button>
+
+                                                <h4 style={{ marginTop: '1rem' }}>Couverture projetée (Futur CAQ)</h4>
+                                                {formData.futureInsurances.map((ins, idx) => (
+                                                    <div key={idx} className="insurance-row fade-in">
+                                                        <input type="date" value={ins.start} onChange={(e) => updateInsurance('future', idx, 'start', e.target.value)} />
+                                                        <span>au</span>
+                                                        <input type="date" value={ins.end} onChange={(e) => updateInsurance('future', idx, 'end', e.target.value)} />
+                                                        <button className="btn-icon" onClick={() => removeInsurance('future', idx)}>×</button>
+                                                    </div>
+                                                ))}
+                                                <button className="btn-secondary btn-small" onClick={() => addInsurance('future')}>+ Ajouter une couverture future</button>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
-                            </section>
+                                    </section>
 
-                            {/* 3. Pièces Justificatives */}
-                            <section className="card form-card">
-                                <div className="card-header">
-                                    <ClipboardCheck size={18} />
-                                    <h2>Pièces Justificatives</h2>
-                                </div>
-                                <div className="checklist-input">
-                                    <label className="checkbox-item">
-                                        <input type="checkbox" name="formDeclaration" checked={formData.formDeclaration} onChange={handleInputChange} />
-                                        <span>Formulaires déclaration et engagement</span>
-                                    </label>
-                                    <label className="checkbox-item">
-                                        <input type="checkbox" name="admissionLetter" checked={formData.admissionLetter} onChange={handleInputChange} />
-                                        <span>
-                                            {formData.isNewProgram
-                                                ? "Lettre d'admission (Nouveau programme)"
-                                                : "Attestation de fréquentation (Programme actuel)"}
-                                        </span>
-                                    </label>
-
-                                    {formData.applicationType === 'Renouvellement' && (
-                                        <div className="sub-section fade-in">
-                                            <label className="checkbox-item">
-                                                <input type="checkbox" name="transcripts" checked={formData.transcripts} onChange={handleInputChange} />
-                                                <span>Relevés de notes officiels</span>
-                                            </label>
-                                            {!formData.transcripts && (
-                                                <label className="checkbox-item ml-4">
-                                                    <input type="checkbox" name="explanationsStudy" checked={formData.explanationsStudy} onChange={handleInputChange} />
-                                                    <span>Lettre explicative (si relevés absents)</span>
-                                                </label>
-                                            )}
-                                            {formData.explanationsStudy && (
-                                                <label className="checkbox-item ml-4">
-                                                    <input type="checkbox" name="fullTimeJustification" checked={formData.fullTimeJustification} onChange={handleInputChange} />
-                                                    <span>Justification Études Temps Plein</span>
-                                                </label>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </section>
-                        </div>
-
-                        <div className="form-column">
-                            {/* 4. Capacité Financière */}
-                            <section className="card form-card">
-                                <div className="card-header">
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    {/* 5. Preuves Financières */}
+                                    <section className="card form-card">
+                                        <div className="card-header">
                                             <DollarSign size={18} />
-                                            <h2>Capacité Financière</h2>
+                                            <h2>Capacité Financière (Art. 14)</h2>
                                         </div>
-                                        <span className="tooltip-trigger territory-tooltip" data-tooltip="Territoires avec preuve Arrima (MIFI) : Autriche, Canada, États-Unis, France, Groenland, Hong Kong, Île de La Réunion, Monaco, Mexique, Saint-Pierre-et-Miquelon. Pour tout autre territoire, les preuves sont présentées au Bureau canadien des visas (IRCC).">
-                                            <Info size={18} className="hint-icon" />
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {formData.country && !FINANCE_MIFI_COUNTRIES.some(c => c.toLowerCase() === formData.country.trim().toLowerCase()) && formData.country !== 'Autre territoire' && (
-                                    <div className="info-box-styled fade-in" style={{ marginBottom: '1.5rem', borderLeft: '4px solid #3182ce', background: '#ebf8ff', color: '#2c5282', padding: '1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <Info size={20} />
-                                        <span><strong>Vérification Fédérale :</strong> Pour ce territoire, les preuves financières sont évaluées par IRCC selon les critères du Québec.</span>
-                                    </div>
-                                )}
-
-                                {formData.isConditional ? (
-                                    <p className="info-box">Vérification financière non requise pour cette catégorie (Conditionnel).</p>
-                                ) : (
-                                    <>
                                         <div className="form-group">
-                                            <label>Qui est le principal payeur ?</label>
+                                            <label>Qui paye les études ?</label>
                                             <div className="segmented-control">
                                                 <label className={`segment ${formData.payerType === 'self' ? 'active' : ''}`}>
                                                     <input type="radio" name="payerType" value="self" checked={formData.payerType === 'self'} onChange={handleInputChange} />
-                                                    Candidat lui-même
+                                                    Candidat (Même)
                                                 </label>
                                                 <label className={`segment ${formData.payerType === 'guarantor' ? 'active' : ''}`}>
                                                     <input type="radio" name="payerType" value="guarantor" checked={formData.payerType === 'guarantor'} onChange={handleInputChange} />
-                                                    Un garant
+                                                    Un Tiers (Garant)
                                                 </label>
                                             </div>
                                         </div>
 
-                                        {formData.payerType === 'guarantor' ? (
-                                            <div className="checklist-input fade-in">
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="supportForm" checked={formData.supportForm} onChange={handleInputChange} />
-                                                    <span>Formulaire de déclaration de soutien financier</span>
+                                        <div className="form-group">
+                                            <label>Mode de vérification</label>
+                                            <div className="segmented-control">
+                                                <label className={`segment ${formData.financeMode === 'calculate' ? 'active' : ''}`}>
+                                                    <input type="radio" name="financeMode" value="calculate" checked={formData.financeMode === 'calculate'} onChange={handleInputChange} />
+                                                    Calcul Automatique
                                                 </label>
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="guarantorFinanceProof" checked={formData.guarantorFinanceProof} onChange={handleInputChange} />
-                                                    <span>Preuve de capacité financière du Garant</span>
+                                                <label className={`segment ${formData.financeMode === 'manual' ? 'active' : ''}`}>
+                                                    <input type="radio" name="financeMode" value="manual" checked={formData.financeMode === 'manual'} onChange={handleInputChange} />
+                                                    Checklist manuelle
                                                 </label>
+                                            </div>
+                                        </div>
+
+                                        {formData.financeMode === 'calculate' ? (
+                                            <div className="form-group fade-in">
+                                                <label>Fonds disponibles ($ CAD)</label>
+                                                <input type="number" name="availableFunds" value={formData.availableFunds} onChange={handleInputChange} placeholder="Ex: 25000" />
+                                                <span className="input-hint">Total des liquidités prouvables (Banque, Bourse...)</span>
                                             </div>
                                         ) : (
                                             <div className="checklist-input fade-in">
                                                 <label className="checkbox-item">
-                                                    <input type="checkbox" name="selfFinanceProof" checked={formData.selfFinanceProof} onChange={handleInputChange} />
-                                                    <span>Preuves récentes de capacité financière (Candidat)</span>
-                                                    <span className="tooltip-trigger" data-tooltip="Relevés, placements, bourses, etc.">
-                                                        <Info size={14} className="hint-icon" />
-                                                    </span>
-                                                </label>
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="bankStatements6Months" checked={formData.bankStatements6Months} onChange={handleInputChange} />
-                                                    <span className="text-accent-bold">Relevés bancaires (6 derniers mois)</span>
-                                                    <span className="tooltip-trigger" data-tooltip="OBLIGATOIRE : Doit montrer l’historique des transactions, le solde et le nom du titulaire.">
-                                                        <Info size={14} className="hint-icon" />
-                                                    </span>
+                                                    <input type="checkbox" name="financialProof" checked={formData.financialProof} onChange={handleInputChange} />
+                                                    <span>Preuves de capacité financière suffisantes</span>
                                                 </label>
                                             </div>
                                         )}
 
-                                        <div className="form-group" style={{ marginTop: '1rem', borderTop: '1px solid #eee', paddingTop: '1rem' }}>
-                                            <label>Précision du montant (Optionnel)</label>
+                                        <div className="checklist-input sub-section" style={{ marginTop: '1rem' }}>
+                                            <h3>Documents requis (MIFI)</h3>
+                                            {formData.payerType === 'guarantor' ? (
+                                                <>
+                                                    <label className="checkbox-item">
+                                                        <input type="checkbox" name="supportForm" checked={formData.supportForm} onChange={handleInputChange} />
+                                                        <span>Déclaration de soutien financier (Signé/Daté)</span>
+                                                    </label>
+                                                    <label className="checkbox-item">
+                                                        <input type="checkbox" name="guarantorFinanceProof" checked={formData.guarantorFinanceProof} onChange={handleInputChange} />
+                                                        <span>Preuves de revenus/fonds du garant (Emploi/Banque)</span>
+                                                    </label>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <label className="checkbox-item">
+                                                        <input type="checkbox" name="selfFinanceProof" checked={formData.selfFinanceProof} onChange={handleInputChange} />
+                                                        <span>Preuves de fonds personnels (Banque/Bourse)</span>
+                                                    </label>
+                                                    <label className="checkbox-item">
+                                                        <input type="checkbox" name="bankStatements6Months" checked={formData.bankStatements6Months} onChange={handleInputChange} />
+                                                        <span>Relévés bancaires (6 derniers mois complets)</span>
+                                                    </label>
+                                                </>
+                                            )}
+                                        </div>
+                                    </section>
+
+                                    {/* 6. Document de Voyage */}
+                                    <section className="card form-card">
+                                        <div className="card-header">
+                                            <ShieldAlert size={18} />
+                                            <h2>Document de Voyage</h2>
+                                        </div>
+                                        <div className="form-group">
+                                            <label>État du Passeport</label>
                                             <div className="segmented-control">
-                                                <label className={`segment ${formData.financeMode === 'calculate' ? 'active' : ''}`}>
-                                                    <input type="radio" name="financeMode" value="calculate" checked={formData.financeMode === 'calculate'} onChange={handleInputChange} />
-                                                    Calcul détaillé
+                                                <label className={`segment ${formData.passportStatus === 'valid' ? 'active' : ''}`}>
+                                                    <input type="radio" name="passportStatus" value="valid" checked={formData.passportStatus === 'valid'} onChange={handleInputChange} />
+                                                    Présent & Valide
                                                 </label>
-                                                <label className={`segment ${formData.financeMode === 'manual' ? 'active' : ''}`}>
-                                                    <input type="radio" name="financeMode" value="manual" checked={formData.financeMode === 'manual'} onChange={handleInputChange} />
-                                                    Validation simple
+                                                <label className={`segment ${formData.passportStatus === 'expired' ? 'active' : ''}`}>
+                                                    <input type="radio" name="passportStatus" value="expired" checked={formData.passportStatus === 'expired'} onChange={handleInputChange} />
+                                                    Présent & Non conforme
+                                                </label>
+                                                <label className={`segment ${formData.passportStatus === 'absent' ? 'active' : ''}`}>
+                                                    <input type="radio" name="passportStatus" value="absent" checked={formData.passportStatus === 'absent'} onChange={handleInputChange} />
+                                                    Absent
                                                 </label>
                                             </div>
                                         </div>
-
-                                        {formData.financeMode === 'calculate' && (
-                                            <div className="form-group fade-in">
-                                                <label>Fonds mobilisables ($ CAD)</label>
-                                                <input type="number" name="availableFunds" value={formData.availableFunds} onChange={handleInputChange} />
+                                        {formData.passportStatus === 'valid' && (
+                                            <div className="checklist-input fade-in" style={{ marginTop: '1rem' }}>
+                                                <label className="checkbox-item">
+                                                    <input type="checkbox" name="passportSigned" checked={formData.passportSigned} onChange={handleInputChange} />
+                                                    <span>Passeport signé par le titulaire (Art. 13 RIQ)</span>
+                                                </label>
                                             </div>
                                         )}
+                                    </section>
 
-                                        <div className="checklist-input">
-                                            <label className="checkbox-item">
-                                                <input type="checkbox" name="financialProof" checked={formData.financialProof} onChange={handleInputChange} />
-                                                <span>{formData.financeMode === 'calculate' ? 'Dossier financier complet' : 'Capacité financière confirmée'}</span>
-                                            </label>
-                                        </div>
-                                    </>
-                                )}
-                            </section>
+                                    {/* 7. Documents pour Mineur */}
+                                    {!analysis.isAdult && (
+                                        <section className="card form-card fade-in">
+                                            <div className="card-header">
+                                                <Users size={18} />
+                                                <h2>Documents pour Mineur</h2>
+                                            </div>
 
-                            {/* 5. Assurances Santé */}
-                            <section className="card form-card">
-                                <div className="card-header">
-                                    <ShieldAlert size={18} />
-                                    <h2>Assurances Santé</h2>
-                                </div>
-                                {formData.studyLevel === 'Universitaire' ? (
-                                    <p className="info-box">L'assurance est réputée incluse pour le niveau universitaire.</p>
-                                ) : (
-                                    <div className="insurance-sections" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                        {formData.applicationType === 'Renouvellement' && (
-                                            <div className="insurance-manager">
-                                                <div className="manager-header">
-                                                    <h3>Périodes passées (Dernière année)</h3>
-                                                    <button className="btn-small" onClick={() => addInsurance('past')}>+ Ajouter</button>
-                                                </div>
-                                                {formData.pastInsurances.map((ins, idx) => (
-                                                    <div key={idx} className="insurance-row">
-                                                        <input type="date" value={ins.start} onChange={(e) => updateInsurance('past', idx, 'start', e.target.value)} />
-                                                        <span>au</span>
-                                                        <input type="date" value={ins.end} onChange={(e) => updateInsurance('past', idx, 'end', e.target.value)} />
-                                                        <button onClick={() => removeInsurance('past', idx)}>×</button>
+                                            {/* Minor Situation Selector */}
+                                            <div className="form-group">
+                                                <label>Situation du Mineur</label>
+                                                <select
+                                                    name="minorSituation"
+                                                    value={formData.minorSituation}
+                                                    onChange={handleInputChange}
+                                                    className="category-select"
+                                                >
+                                                    <option value="both_parents">Situation A: Accompagné par les deux parents</option>
+                                                    <option value="one_parent">Situation B: Accompagné par un seul parent</option>
+                                                    <option value="unaccompanied">Situation C: Non accompagné</option>
+                                                    <option value="emancipated">Situation D: Émancipé (17 ans ou jugement)</option>
+                                                </select>
+                                            </div>
+
+                                            {/* Common Documents (All Situations A, B, C) */}
+                                            {formData.minorSituation !== 'emancipated' && (
+                                                <div className="sub-section fade-in">
+                                                    <h3>Documents Communs (Toutes Situations)</h3>
+                                                    <div className="checklist-input">
+                                                        <label className="checkbox-item">
+                                                            <input type="checkbox" name="birthCertificate" checked={formData.birthCertificate} onChange={handleInputChange} />
+                                                            <span>Certificat de naissance (avec noms parents)</span>
+                                                        </label>
+                                                        <label className="checkbox-item">
+                                                            <input type="checkbox" name="parentsIdentity" checked={formData.parentsIdentity} onChange={handleInputChange} />
+                                                            <span>Identité des deux parents (Passeport/CNI)</span>
+                                                        </label>
                                                     </div>
-                                                ))}
-                                                {formData.pastInsurances.length === 0 && <p className="hint">Aucune période passée ajoutée.</p>}
-                                            </div>
+                                                </div>
+                                            )}
+
+                                            {/* Situation A: Both Parents */}
+                                            {formData.minorSituation === 'both_parents' && (
+                                                <div className="sub-section fade-in">
+                                                    <h3>Situation A: Accompagné par les deux parents</h3>
+                                                    <p className="info-box" style={{ marginBottom: '1rem' }}>
+                                                        Enfant accompagné par ses deux parents. Preuve du séjour valide requis.
+                                                    </p>
+                                                    <div className="checklist-input">
+                                                        <label className="checkbox-item">
+                                                            <input type="checkbox" name="accompanyingParentsStatus" checked={formData.accompanyingParentsStatus} onChange={handleInputChange} />
+                                                            <span>Durée du séjour des parents (Permis/Admission/Statut de résident)</span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Situation B: One Parent */}
+                                            {formData.minorSituation === 'one_parent' && (
+                                                <div className="sub-section fade-in">
+                                                    <h3>Situation B: Accompagné par un seul parent</h3>
+                                                    <p className="info-box" style={{ marginBottom: '1rem' }}>
+                                                        Enfant accompagné par un seul parent. Preuve de garde exclusive OU consentement de l'autre parent requis.
+                                                    </p>
+                                                    <div className="checklist-input">
+                                                        <label className="checkbox-item">
+                                                            <input type="checkbox" name="legalCustody" checked={formData.legalCustody} onChange={handleInputChange} />
+                                                            <span>Jugement de garde exclusive</span>
+                                                        </label>
+                                                        <label className="checkbox-item">
+                                                            <input type="checkbox" name="otherParentConsent" checked={formData.otherParentConsent} onChange={handleInputChange} />
+                                                            <span>Formulaire de consentement (signé par le parent absent)</span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Situation C: Unaccompanied */}
+                                            {formData.minorSituation === 'unaccompanied' && (
+                                                <div className="sub-section fade-in">
+                                                    <h3>Situation C: Non accompagné</h3>
+                                                    <p className="info-box" style={{ marginBottom: '1rem' }}>
+                                                        Délégation de l'autorité parentale à un résident canadien requis.
+                                                    </p>
+                                                    <div className="checklist-input">
+                                                        <label className="checkbox-item">
+                                                            <input type="checkbox" name="delegationAuthority" checked={formData.delegationAuthority} onChange={handleInputChange} />
+                                                            <span>Déclaration de délégation de l'autorité parentale (signée parents)</span>
+                                                        </label>
+                                                        <label className="checkbox-item">
+                                                            <input type="checkbox" name="custodianshipDeclaration" checked={formData.custodianshipDeclaration} onChange={handleInputChange} />
+                                                            <span>Déclaration du gardien au Canada (signée gardien)</span>
+                                                        </label>
+                                                        <label className="checkbox-item">
+                                                            <input type="checkbox" name="custodianDoc" checked={formData.custodianDoc} onChange={handleInputChange} />
+                                                            <span>Preuve de citoyenneté/résidence du gardien</span>
+                                                        </label>
+                                                        <label className="checkbox-item">
+                                                            <input type="checkbox" name="criminalRecordCheck" checked={formData.criminalRecordCheck} onChange={handleInputChange} />
+                                                            <span>Absence d'antécédents judiciaires (tous adultes du foyer)</span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Situation D: Emancipated */}
+                                            {formData.minorSituation === 'emancipated' && (
+                                                <div className="sub-section fade-in">
+                                                    <h3>Situation D: Émancipé ou 17 ans</h3>
+                                                    <p className="info-box" style={{ marginBottom: '1rem' }}>
+                                                        Mineur émancipé ou âgé de 17 ans. Règles applicables à un candidat majeur, avec jugement d'émancipation si applicable.
+                                                    </p>
+                                                    <div className="checklist-input">
+                                                        <label className="checkbox-item">
+                                                            <input type="checkbox" name="emancipationJudgment" checked={formData.emancipationJudgment} onChange={handleInputChange} />
+                                                            <span>Jugement d'émancipation (si applicable)</span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </section>
+                                    )}
+                                </div>
+
+                                <div className="action-footer" style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '2rem' }}>
+                                    <button className="btn-primary large" onClick={() => { setReportSource('dossier'); setShowDossierResults(true); }} style={{ maxWidth: '500px' }}>
+                                        Lancer l'Analyse du Dossier <ArrowRight size={18} />
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="analysis-layout fade-in" style={{ gridColumn: '1 / -1' }}>
+                                <div className="summary-banner" style={{ background: getRecommendationColor(analysis.recommendation) }}>
+                                    <div className="rec-info">
+                                        <span className="category-label">{analysis.category || 'Categorie non specifiee'}</span>
+                                        <div className="caq-period">
+                                            CAQ du <strong>{analysis.caqStart && analysis.caqStart.toString() !== 'Invalid Date' ? format(analysis.caqStart, 'dd/MM/yyyy') : '??'}</strong> au <strong>{analysis.caqEnd && analysis.caqEnd.toString() !== 'Invalid Date' ? format(analysis.caqEnd, 'dd/MM/yyyy') : '??'}</strong>
+                                        </div>
+                                    </div>
+                                    <div className="rec-text">
+                                        <span className="label">RECOMMANDATION ADMINISTRATIVE</span>
+                                        <h3>{analysis.recommendation}</h3>
+                                    </div>
+                                    <div className="rec-stats">
+                                        <div className="stat"><strong>{analysis.summary.blockingCount}</strong> Bloquants</div>
+                                        <div className="stat"><strong>{analysis.summary.majorCount}</strong> Majeurs</div>
+                                    </div>
+                                </div>
+
+                                <div className="analysis-grid">
+                                    <div className="column">
+                                        {/* Only show Rapport d'Analyse Individuelle if there's actual timeline data to show besides basic CAQ dates */}
+                                        {(timelineEvents.length > 0 || formData.startDate) && (
+                                            <section className="card res-card mode-header-dossier">
+                                                <h2 style={{ color: 'inherit' }}>Rapport d'Analyse Individuelle</h2>
+                                                <Timeline
+                                                    startDate={formData.startDate}
+                                                    endDate={formData.endDate}
+                                                    caqStart={analysis.caqStart}
+                                                    caqEnd={analysis.caqEnd}
+                                                    entryDate={formData.entryDate}
+                                                    isNewProgram={formData.isNewProgram}
+                                                    hideEmptyMessage={true}
+                                                />
+                                                {analysis.caqStart && (
+                                                    <div className="date-hints">
+                                                        <div className="hint">Prévoyance Installation : <strong>{format(analysis.caqStart, 'dd/MM/yyyy')}</strong></div>
+                                                        <div className="hint">Marge Post-Études : <strong>{format(analysis.caqEnd, 'dd/MM/yyyy')}</strong></div>
+                                                    </div>
+                                                )}
+                                            </section>
                                         )}
 
-                                        <div className="insurance-manager">
-                                            <div className="manager-header">
-                                                <h3>Périodes futures (Prochaine année)</h3>
-                                                <button className="btn-small" onClick={() => addInsurance('future')}>+ Ajouter</button>
+                                        <section className="card res-card">
+                                            <h2>Résumé du Dossier</h2>
+                                            <div className="summary-list">
+                                                <div className="summary-item"><span>Dossier N°:</span> <strong>{formData.fileNumber || 'Non spécifié'}</strong></div>
+                                                <div className="summary-item"><span>Profil:</span> <strong>{analysis.summary.profile}</strong></div>
+                                                <div className="summary-item"><span>Niveau:</span> <strong>{analysis.summary.level}</strong></div>
+                                                <div className="summary-item"><span>Demande:</span> <strong>{analysis.summary.type}</strong></div>
+                                                <div className="summary-item"><span>Passeport:</span> <strong>{analysis.summary.passport}</strong></div>
                                             </div>
-                                            {formData.futureInsurances.map((ins, idx) => (
-                                                <div key={idx} className="insurance-row">
-                                                    <input type="date" value={ins.start} onChange={(e) => updateInsurance('future', idx, 'start', e.target.value)} />
-                                                    <span>au</span>
-                                                    <input type="date" value={ins.end} onChange={(e) => updateInsurance('future', idx, 'end', e.target.value)} />
-                                                    <button onClick={() => removeInsurance('future', idx)}>×</button>
+                                        </section>
+
+                                        <section className="card res-card">
+                                            <h2>Analyse Financière</h2>
+                                            {formData.financeMode === 'calculate' ? (
+                                                <div className="finance-status">
+                                                    <div className="summary-item"><span>Disponible:</span> <strong>{formData.availableFunds}$</strong></div>
+                                                    <div className="summary-item"><span>Seuil requis:</span> <strong>{FINANCIAL_THRESHOLDS[formData.studyLevel] || 15478}$</strong></div>
+                                                    <div className="progress-bar-container" style={{
+                                                        height: '12px',
+                                                        background: '#edf2f7',
+                                                        borderRadius: '6px',
+                                                        overflow: 'hidden',
+                                                        marginTop: '1.5rem'
+                                                    }}>
+                                                        <div className="progress-bar" style={{
+                                                            height: '100%',
+                                                            width: `${Math.min(100, (formData.availableFunds / (FINANCIAL_THRESHOLDS[formData.studyLevel] || 15478)) * 100)}%`,
+                                                            background: formData.availableFunds >= (FINANCIAL_THRESHOLDS[formData.studyLevel] || 15478) ? '#48bb78' : '#e53e3e',
+                                                            transition: 'width 0.5s ease-out'
+                                                        }}></div>
+                                                    </div>
                                                 </div>
-                                            ))}
-                                            {formData.futureInsurances.length === 0 && <p className="hint">Aucune période future ajoutée.</p>}
-                                        </div>
+                                            ) : (
+                                                <div className="summary-item">
+                                                    <span>Statut:</span>
+                                                    <strong style={{ color: formData.financialProof ? '#48bb78' : '#e53e3e' }}>
+                                                        {formData.financialProof ? 'Prouvé' : 'À justifier'}
+                                                    </strong>
+                                                </div>
+                                            )}
+                                        </section>
                                     </div>
-                                )}
-                            </section>
-
-                            {/* 6. Document de Voyage */}
-                            <section className="card form-card">
-                                <div className="card-header">
-                                    <ShieldAlert size={18} />
-                                    <h2>Document de Voyage</h2>
-                                </div>
-                                <div className="form-group">
-                                    <label>État du Passeport</label>
-                                    <div className="segmented-control">
-                                        <label className={`segment ${formData.passportStatus === 'valid' ? 'active' : ''}`}>
-                                            <input type="radio" name="passportStatus" value="valid" checked={formData.passportStatus === 'valid'} onChange={handleInputChange} />
-                                            Présent & Valide
-                                        </label>
-                                        <label className={`segment ${formData.passportStatus === 'expired' ? 'active' : ''}`}>
-                                            <input type="radio" name="passportStatus" value="expired" checked={formData.passportStatus === 'expired'} onChange={handleInputChange} />
-                                            Présent & Non conforme
-                                        </label>
-                                        <label className={`segment ${formData.passportStatus === 'absent' ? 'active' : ''}`}>
-                                            <input type="radio" name="passportStatus" value="absent" checked={formData.passportStatus === 'absent'} onChange={handleInputChange} />
-                                            Absent
-                                        </label>
+                                    <div className="column">
+                                        <section className="card res-card">
+                                            <h2>Checklist des Manquements</h2>
+                                            <Checklist controls={analysis.controls} />
+                                        </section>
                                     </div>
                                 </div>
-                                {formData.passportStatus === 'valid' && (
-                                    <div className="checklist-input fade-in" style={{ marginTop: '1rem' }}>
-                                        <label className="checkbox-item">
-                                            <input type="checkbox" name="passportSigned" checked={formData.passportSigned} onChange={handleInputChange} />
-                                            <span>Passeport signé par le titulaire (Art. 13 RIQ)</span>
-                                        </label>
-                                    </div>
-                                )}
-                            </section>
 
-                            {/* 7. Documents pour Mineur */}
-                            {!analysis.isAdult && (
-                                <section className="card form-card fade-in">
-                                    <div className="card-header">
-                                        <Users size={18} />
-                                        <h2>Documents pour Mineur</h2>
-                                    </div>
-
-                                    {/* Minor Situation Selector */}
-                                    <div className="form-group">
-                                        <label>Situation du Mineur</label>
-                                        <select
-                                            name="minorSituation"
-                                            value={formData.minorSituation}
-                                            onChange={handleInputChange}
-                                            className="category-select"
-                                        >
-                                            <option value="both_parents">Situation A: Accompagné par les deux parents</option>
-                                            <option value="one_parent">Situation B: Accompagné par un seul parent</option>
-                                            <option value="unaccompanied">Situation C: Non accompagné</option>
-                                            <option value="emancipated">Situation D: Émancipé (17 ans ou jugement)</option>
-                                        </select>
-                                    </div>
-
-                                    {/* Common Documents (All Situations A, B, C) */}
-                                    {formData.minorSituation !== 'emancipated' && (
-                                        <div className="sub-section fade-in">
-                                            <h3>Documents Communs (Toutes Situations)</h3>
-                                            <div className="checklist-input">
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="birthCertificate" checked={formData.birthCertificate} onChange={handleInputChange} />
-                                                    <span>Certificat de naissance (avec noms parents)</span>
-                                                </label>
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="parentsIdentity" checked={formData.parentsIdentity} onChange={handleInputChange} />
-                                                    <span>Identité des deux parents (Passeport/CNI)</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Situation A: Both Parents */}
-                                    {formData.minorSituation === 'both_parents' && (
-                                        <div className="sub-section fade-in">
-                                            <h3>Situation A: Accompagné par les deux parents</h3>
-                                            <p className="info-box" style={{ marginBottom: '1rem' }}>
-                                                Enfant accompagné par ses deux parents. Preuve du séjour valide requis.
-                                            </p>
-                                            <div className="checklist-input">
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="accompanyingParentsStatus" checked={formData.accompanyingParentsStatus} onChange={handleInputChange} />
-                                                    <span>Durée du séjour des parents (Permis/Admission/Statut de résident)</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Situation B: One Parent */}
-                                    {formData.minorSituation === 'one_parent' && (
-                                        <div className="sub-section fade-in">
-                                            <h3>Situation B: Accompagné par un seul parent</h3>
-                                            <p className="info-box" style={{ marginBottom: '1rem' }}>
-                                                Enfant accompagné par un seul parent. Preuve de garde exclusive OU consentement de l'autre parent requis.
-                                            </p>
-                                            <div className="checklist-input">
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="legalCustody" checked={formData.legalCustody} onChange={handleInputChange} />
-                                                    <span>Jugement de garde exclusive</span>
-                                                </label>
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="otherParentConsent" checked={formData.otherParentConsent} onChange={handleInputChange} />
-                                                    <span>Formulaire de consentement (signé par le parent absent)</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Situation C: Unaccompanied */}
-                                    {formData.minorSituation === 'unaccompanied' && (
-                                        <div className="sub-section fade-in">
-                                            <h3>Situation C: Non accompagné</h3>
-                                            <p className="info-box" style={{ marginBottom: '1rem' }}>
-                                                Délégation de l'autorité parentale à un résident canadien requis.
-                                            </p>
-                                            <div className="checklist-input">
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="delegationAuthority" checked={formData.delegationAuthority} onChange={handleInputChange} />
-                                                    <span>Déclaration de délégation de l'autorité parentale (signée parents)</span>
-                                                </label>
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="custodianshipDeclaration" checked={formData.custodianshipDeclaration} onChange={handleInputChange} />
-                                                    <span>Déclaration du gardien au Canada (signée gardien)</span>
-                                                </label>
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="custodianDoc" checked={formData.custodianDoc} onChange={handleInputChange} />
-                                                    <span>Preuve de citoyenneté/résidence du gardien</span>
-                                                </label>
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="criminalRecordCheck" checked={formData.criminalRecordCheck} onChange={handleInputChange} />
-                                                    <span>Absence d'antécédents judiciaires (tous adultes du foyer)</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Situation D: Emancipated */}
-                                    {formData.minorSituation === 'emancipated' && (
-                                        <div className="sub-section fade-in">
-                                            <h3>Situation D: Émancipé ou 17 ans</h3>
-                                            <p className="info-box" style={{ marginBottom: '1rem' }}>
-                                                Mineur émancipé ou âgé de 17 ans. Règles applicables à un candidat majeur, avec jugement d'émancipation si applicable.
-                                            </p>
-                                            <div className="checklist-input">
-                                                <label className="checkbox-item">
-                                                    <input type="checkbox" name="emancipationJudgment" checked={formData.emancipationJudgment} onChange={handleInputChange} />
-                                                    <span>Jugement d'émancipation (si applicable)</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    )}
-                                </section>
-                            )}
-                        </div>
-
-                        <div className="action-footer">
-                            <button className="btn-primary large" onClick={() => { setReportSource('dossier'); setActiveTab('analysis'); }}>
-                                Lancer l'Analyse du Dossier <ArrowRight size={18} />
-                            </button>
-                        </div>
+                                <div className="analysis-actions no-print">
+                                    <button className="btn-secondary" onClick={() => setShowDossierResults(false)}>
+                                        <ArrowRight size={18} style={{ transform: 'rotate(180deg)' }} /> Modifier les données
+                                    </button>
+                                    <button
+                                        className="btn-primary"
+                                        onClick={() => handleGenerateReport('dossier')}
+                                        style={{ background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)' }}
+                                    >
+                                        <FileText size={18} /> Analyse du dossier
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                ) : activeTab === 'chronology' ? (
+                ) : (
                     <div className="tab-content fade-in">
                         <div style={{ marginBottom: '2rem', background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
@@ -1034,7 +1115,6 @@ function App() {
                                         customEvents={timelineEvents}
                                     />
 
-                                    {/* GLOBAL COMPLIANCE REPORT */}
                                     <div style={{ marginTop: '1.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
                                         <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <ShieldAlert size={18} color={timelineAnalysis.globalStatus === 'Exemplaire' ? '#10b981' : timelineAnalysis.globalStatus === 'Conforme' ? '#3b82f6' : '#e53e3e'} />
@@ -1087,260 +1167,13 @@ function App() {
                             </div>
                         </div>
                         <div className="action-footer">
-                            <button className="btn-primary large" onClick={() => { setReportSource('pathway'); setActiveTab('analysis'); }} style={{ background: 'var(--pathway-primary)' }}>
+                            <button className="btn-primary large" onClick={() => handleGenerateReport('chronology')} style={{ background: 'var(--pathway-primary)' }}>
                                 Générer le Rapport de Parcours <ShieldAlert size={18} />
                             </button>
                         </div>
                     </div>
-                ) : (
-                    activeTab === 'analysis' && !hasStarted ? (
-                        <>
-                            <div className="no-print" style={{ marginBottom: '2rem', background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-                                    <div style={{ background: 'rgb(255, 245, 245)', padding: '10px', borderRadius: '12px' }}>
-                                        <ShieldAlert size={24} color="#e53e3e" />
-                                    </div>
-                                    <div>
-                                        <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#2d3748' }}>Rapport de Diagnostic &amp; Risques</h2>
-                                        <p style={{ margin: '4px 0 0', color: '#718096', fontSize: '0.95rem' }}>
-                                            Synth&egrave;se d&eacute;taill&eacute;e des points de non-conformit&eacute; et recommandations correctives pour le candidat.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="empty-state-container fade-in">
-                                <div className="empty-state-card">
-                                    <ClipboardCheck size={48} color="var(--primary)" opacity={0.5} />
-                                    <h3>Aucune donn&eacute;e &agrave; analyser</h3>
-                                    <p>Veuillez d'abord remplir les informations de votre dossier dans l'onglet <strong>Analyse du Dossier</strong> pour g&eacute;n&eacute;rer votre rapport personnalis&eacute;.</p>
-                                    <button className="btn-primary" onClick={() => setActiveTab('input')}>
-                                        Commencer l'Analyse
-                                    </button>
-                                </div>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="analysis-layout fade-in">
-                            <div className="no-print" style={{ gridColumn: '1 / -1', marginBottom: '2rem', background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-                                    <div style={{ background: 'rgb(255, 245, 245)', padding: '10px', borderRadius: '12px' }}>
-                                        <ShieldAlert size={24} color="#e53e3e" />
-                                    </div>
-                                    <div>
-                                        <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#2d3748' }}>Rapport de Diagnostic &amp; Risques</h2>
-                                        <p style={{ margin: '4px 0 0', color: '#718096', fontSize: '0.95rem' }}>
-                                            Synth&egrave;se d&eacute;taill&eacute;e des points de non-conformit&eacute; et recommandations correctives pour le candidat.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {reportSource === 'dossier' ? (
-                                <div className="summary-banner" style={{ background: getRecommendationColor(analysis.recommendation) }}>
-                                    <div className="rec-info">
-                                        <span className="category-label">{analysis.category || 'Categorie non specifiee'}</span>
-                                        <div className="caq-period">
-                                            CAQ du <strong>{analysis.caqStart && analysis.caqStart.toString() !== 'Invalid Date' ? format(analysis.caqStart, 'dd/MM/yyyy') : '??'}</strong> au <strong>{analysis.caqEnd && analysis.caqEnd.toString() !== 'Invalid Date' ? format(analysis.caqEnd, 'dd/MM/yyyy') : '??'}</strong>
-                                        </div>
-                                    </div>
-                                    <div className="rec-text">
-                                        <span className="label">RECOMMANDATION ADMINISTRATIVE</span>
-                                        <h3>{analysis.recommendation}</h3>
-                                    </div>
-                                    <div className="rec-stats">
-                                        <div className="stat"><strong>{analysis.summary.blockingCount}</strong> Bloquants</div>
-                                        <div className="stat"><strong>{analysis.summary.majorCount}</strong> Majeurs</div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="summary-banner" style={{ background: getTimelineStatusColor(timelineStatusLabel) }}>
-                                    <div className="rec-info">
-                                        <span className="category-label">Rapport de parcours</span>
-                                        <div className="caq-period">
-                                            Periode du <strong>{timelineRange?.min ? format(timelineRange.min, 'dd/MM/yyyy') : '??'}</strong> au <strong>{timelineRange?.max ? format(timelineRange.max, 'dd/MM/yyyy') : '??'}</strong>
-                                        </div>
-                                    </div>
-                                    <div className="rec-text">
-                                        <span className="label">STATUT CHRONOLOGIQUE</span>
-                                        <h3>{timelineStatusLabel}</h3>
-                                    </div>
-                                    <div className="rec-stats">
-                                        <div className="stat"><strong>{timelineScore}</strong> Score</div>
-                                        <div className="stat"><strong>{timelineIssuesCount}</strong> Anomalies</div>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="analysis-grid">
-                                {reportSource === 'dossier' ? (
-                                    <div className="column">
-                                        <section className="card res-card mode-header-dossier">
-                                            <h2 style={{ color: 'inherit' }}>Rapport d'Analyse Individuelle</h2>
-                                            <Timeline
-                                                startDate={formData.startDate}
-                                                endDate={formData.endDate}
-                                                caqStart={analysis.caqStart}
-                                                caqEnd={analysis.caqEnd}
-                                                entryDate={formData.entryDate}
-                                                isNewProgram={formData.isNewProgram}
-                                            />
-                                            {analysis.caqStart && (
-                                                <div className="date-hints">
-                                                    <div className="hint">Prévoyance Installation : <strong>{format(analysis.caqStart, 'dd/MM/yyyy')}</strong></div>
-                                                    <div className="hint">Marge Post-Études : <strong>{format(analysis.caqEnd, 'dd/MM/yyyy')}</strong></div>
-                                                </div>
-                                            )}
-                                        </section>
-
-                                        <section className="card res-card">
-                                            <h2>Résumé du Dossier</h2>
-                                            <div className="summary-list">
-                                                <div className="summary-item"><span>Dossier N°:</span> <strong>{formData.fileNumber || 'Non spécifié'}</strong></div>
-                                                <div className="summary-item"><span>Profil:</span> <strong>{analysis.summary.profile}</strong></div>
-                                                <div className="summary-item"><span>Niveau:</span> <strong>{analysis.summary.level}</strong></div>
-                                                <div className="summary-item"><span>Demande:</span> <strong>{analysis.summary.type}</strong></div>
-                                                <div className="summary-item"><span>Passeport:</span> <strong>{analysis.summary.passport}</strong></div>
-                                            </div>
-                                        </section>
-                                    </div>
-                                ) : (
-                                    <div className="column" style={{ gridColumn: '1 / -1' }}>
-                                        <section className="card res-card mode-header-pathway">
-                                            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                                                <h2 style={{ color: 'inherit', margin: 0 }}>Rapport de Reconstitution Chronologique (Parcours)</h2>
-                                                <div style={{ display: 'flex', gap: '8px' }}>
-                                                    <button
-                                                        onClick={handleGenerateReport}
-                                                        className="btn-primary"
-                                                        style={{
-                                                            background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-                                                            fontSize: '0.8rem',
-                                                            padding: '6px 12px'
-                                                        }}
-                                                    >
-                                                        <FileText size={16} /> Rapport Narratif
-                                                    </button>
-                                                    <button
-                                                        className="btn-small"
-                                                        onClick={() => setShow3DTimeline(true)}
-                                                        disabled={!timelineEvents || timelineEvents.length === 0}
-                                                        title={(!timelineEvents || timelineEvents.length === 0) ? "Ajoutez des événements pour visualiser la 3D" : "Voir en 3D"}
-                                                        style={{
-                                                            background: 'var(--primary)',
-                                                            color: 'white',
-                                                            border: 'none',
-                                                            borderRadius: '8px',
-                                                            padding: '6px 12px',
-                                                            fontSize: '0.8rem',
-                                                            fontWeight: 600,
-                                                            opacity: (!timelineEvents || timelineEvents.length === 0) ? 0.5 : 1,
-                                                            cursor: (!timelineEvents || timelineEvents.length === 0) ? 'not-allowed' : 'pointer'
-                                                        }}
-                                                    >
-                                                        👁️ Visionner en 3D
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <Timeline
-                                                customEvents={timelineEvents}
-                                            />
-                                            <p className="hint" style={{ marginBottom: '1.5rem' }}>Analyse complète de la continuité, des délais et des statuts.</p>
-
-                                            {/* GLOBAL COMPLIANCE REPORT (DUPLICATED FOR REPORT VIEW) */}
-                                            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
-                                                <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <ShieldAlert size={18} color={timelineAnalysis.globalStatus === 'Exemplaire' ? '#10b981' : timelineAnalysis.globalStatus === 'Conforme' ? '#3b82f6' : '#e53e3e'} />
-                                                    Rapport de Conformité Chronologique
-                                                </h3>
-
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                                                    <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                                                        <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Score Global</div>
-                                                        <div style={{ fontSize: '2rem', fontWeight: 800, color: timelineAnalysis.score >= 80 ? '#10b981' : timelineAnalysis.score >= 50 ? '#f59e0b' : '#e53e3e', lineHeight: 1.2 }}>
-                                                            {timelineAnalysis.score}<span style={{ fontSize: '1rem', color: '#94a3b8' }}>/100</span>
-                                                        </div>
-                                                        <div style={{ fontSize: '0.9rem', fontWeight: 700, marginTop: '5px' }}>{timelineAnalysis.globalStatus}</div>
-                                                    </div>
-                                                    <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                                                        <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Anomalies</div>
-                                                        <div style={{ fontSize: '2rem', fontWeight: 800, lineHeight: 1.2 }}>
-                                                            {(timelineAnalysis.allAlerts || []).length}
-                                                        </div>
-                                                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Points d'attention</div>
-                                                    </div>
-                                                    <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                                                        <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Statut CAQ</div>
-                                                        <div style={{ fontSize: '2rem', fontWeight: 800, lineHeight: 1.2 }}>
-                                                            {timelineEvents.filter(e => e.type === 'CAQ').length}
-                                                        </div>
-                                                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Délivrés</div>
-                                                    </div>
-                                                </div>
-
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                    {(timelineAnalysis.allAlerts || []).map((alert, i) => (
-                                                        <div key={i} style={{
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '12px',
-                                                            fontSize: '0.95rem',
-                                                            color: alert.type === 'error' ? '#b91c1c' : alert.type === 'warning' ? '#c2410c' : '#15803d',
-                                                            background: alert.type === 'error' ? '#fef2f2' : alert.type === 'warning' ? '#fff7ed' : '#f0fdf4',
-                                                            padding: '12px',
-                                                            borderRadius: '8px',
-                                                            border: alert.type === 'error' ? '1px solid #fecaca' : alert.type === 'warning' ? '1px solid #fed7aa' : '1px solid #bbf7d0'
-                                                        }}>
-                                                            {alert.type === 'error' ? <AlertTriangle size={20} style={{ flexShrink: 0 }} /> :
-                                                                alert.type === 'warning' ? <ShieldAlert size={20} style={{ flexShrink: 0 }} /> :
-                                                                    <CheckCircle2 size={20} style={{ flexShrink: 0 }} />}
-                                                            <span style={{ fontWeight: 500 }}>{alert.message}</span>
-                                                        </div>
-                                                    ))}
-
-                                                    {(timelineAnalysis.allAlerts || []).length === 0 && (
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1rem', color: '#15803d', background: '#f0fdf4', padding: '16px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                                                            <CheckCircle2 size={24} style={{ flexShrink: 0 }} />
-                                                            <div>
-                                                                <strong style={{ display: 'block' }}>Parcours Conforme</strong>
-                                                                <span style={{ fontSize: '0.9rem', opacity: 0.9 }}>Aucune rupture de continuité ou manque d'assurance détecté dans l'historique fourni.</span>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </section>
-                                    </div>
-                                )}
-
-                                {reportSource === 'dossier' && (
-                                    <div className="column">
-                                        <section className="card res-card">
-                                            <h2>Checklist des Manquements</h2>
-                                            <Checklist controls={analysis.controls} />
-                                        </section>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="analysis-actions no-print">
-                                <button className="btn-secondary" onClick={() => setActiveTab('input')}>
-                                    Modifier les données
-                                </button>
-                                <button className="btn-primary" onClick={() => window.print()}>
-                                    <Printer size={18} /> Imprimer Rapport PDF
-                                </button>
-                                <button
-                                    className="btn-primary"
-                                    onClick={handleGenerateReport}
-                                    style={{ background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)' }}
-                                >
-                                    <FileText size={18} /> Rapport détaillé (IA)
-                                </button>
-                            </div>
-                        </div>
-                    )
                 )}
-            </main >
+            </main>
 
             {/* AI Detailed Report Modal */}
             <DetailedReportModal
@@ -1681,22 +1514,24 @@ function App() {
           }
         }
       `}</style>
-            {showResetModal && (
-                <div className="modal-overlay fade-in no-print">
-                    <div className="modal-content scale-in">
-                        <div className="modal-header-custom">
-                            <AlertTriangle size={48} color="#dc2626" />
-                            <h3>Réinitialiser les données ?</h3>
-                        </div>
-                        <p>Cette action effacera définitivement toutes les informations saisies dans l'analyse et la chronologie.</p>
-                        <div className="modal-actions">
-                            <button className="btn-secondary" onClick={() => setShowResetModal(false)}>Annuler</button>
-                            <button className="btn-primary btn-danger" onClick={confirmReset}>Confirmer l'effacement</button>
+            {
+                showResetModal && (
+                    <div className="modal-overlay fade-in no-print">
+                        <div className="modal-content scale-in">
+                            <div className="modal-header-custom">
+                                <AlertTriangle size={48} color="#dc2626" />
+                                <h3>Réinitialiser les données ?</h3>
+                            </div>
+                            <p>Cette action effacera définitivement toutes les informations saisies dans l'analyse et la chronologie.</p>
+                            <div className="modal-actions">
+                                <button className="btn-secondary" onClick={() => setShowResetModal(false)}>Annuler</button>
+                                <button className="btn-primary btn-danger" onClick={confirmReset}>Confirmer l'effacement</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div >
+                )
+            }
+        </div>
     )
 }
 

@@ -14,7 +14,6 @@ const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 // Comprehensive mapping of technical event IDs to professional French labels
 const EVENT_TYPE_LABELS = {
-    // PARCOURS & VIE DU CANDIDAT
     'CAQ': 'Demande de CAQ / Certificat d\'Acceptation du Québec',
     'WORK_PERMIT': 'Permis de Travail ou Permis d\'Études',
     'DOCS_SENT': 'Dépôt du dossier / Envoi des documents au MIFI',
@@ -24,76 +23,112 @@ const EVENT_TYPE_LABELS = {
     'EXIT': 'Sortie du territoire canadien',
     'MEDICAL': 'Congé médical ou période d\'interruption pour santé',
     'OTHER': 'Événement divers',
-
-    // ACTES ADMINISTRATIFS & DÉCISIONS
     'CAQ_REFUSAL': 'Décision de Refus de CAQ',
     'INTENT_REFUSAL': 'Avis d\'intention de refus (MIFI)',
     'INTENT_CANCEL': 'Avis d\'intention d\'annulation du CAQ',
     'CAQ_CANCEL': 'Confirmation d\'annulation du CAQ',
     'FRAUD_REJECTION': 'Rejet pour Faux ou Trompeur (Art. 56-57 LIQ)',
     'INTERVIEW': 'Convocation à une entrevue avec l\'immigration',
-
-    // FALLBACKS / OTHER LOGIC TYPES
     'VISA': 'Permis d\'études / Visa de résident temporaire',
     'REFUSAL': 'Décision de refus (Générique)',
     'EXT_STATUS': 'Période de Statut maintenu / Rétablissement de statut'
 };
 
 /**
- * Generates a detailed narrative report based on the dossier data and analysis results.
+ * TYPE 1: Dossier Analysis Report
+ * Focuses on evaluating the current application's chances and documents.
  */
-export async function generateDetailedReport(dossierData, analysisResults, events) {
-    if (!genAI) {
-        throw new Error("Connexion aux services de rapport indisponible (Clé manquante).");
-    }
+export async function generateDossierReport(dossierData, analysisResults) {
+    if (!genAI) throw new Error("Service indisponible.");
 
     const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
-
     const prompt = `
-Tu es un Expert Conseil en Immigration Senior spécialisé dans les dossiers de CAQ (Certificat d'Acceptation du Québec) pour les étudiants étrangers.
-Ton rôle est de rédiger un "Compte-rendu d'analyse détaillée" pour un dossier de candidature.
+Tu es un Expert Conseil en Immigration Senior spécialisé dans les dossiers de CAQ.
+Ton rôle est de rédiger un "Compte-rendu d'évaluation du dossier" (Current Application).
 
-Données du dossier :
+Données du dossier actuel :
 - Profil : ${dossierData.category}
 - Niveau d'études : ${dossierData.studyLevel}
 - Type de demande : ${dossierData.applicationType}
 - Pays de résidence : ${dossierData.country || 'Non spécifié'}
 - Date de naissance : ${dossierData.dob} (${analysisResults.summary.profile})
 
-Résultats de l'analyse automatique (Points techniques) :
+Résultats de l'analyse technique (Checklist) :
 ${analysisResults.controls.map(c => `- ${c.label}: ${c.status} (${c.note || 'Pas de note'})`).join('\n')}
 
-Chronologie des événements :
-${events && events.length > 0 ? events.map(e => {
-        const mainDate = e.submissionDate || e.start || e.end || 'Date non spécifiée';
-        const period = (e.start && e.end) ? ` (Période complète : du ${e.start} au ${e.end})` : '';
-        const level = e.level ? ` [Niveau: ${e.level}]` : '';
-        const prog = e.linkedProgram ? ` [Programme: ${e.linkedProgram}]` : '';
-        return `- ${mainDate}${period}${level}${prog} : ${EVENT_TYPE_LABELS[e.type] || e.type} (${e.title || e.note || 'Pas d\'observation'})`;
-    }).join('\n') : "Aucune chronologie fournie."}
-
-CONSIGNES POUR LE RAPPORT :
-1. Titre : # Compte-rendu d'analyse détaillée
-2. Ton : Professionnel, factuel, rassurant mais lucide. Utilise le "Nous" ou une forme impersonnelle ("L'analyse révèle...").
-3. Structure :
-   - ## Synthèse du profil : Présente brièvement le candidat et l'objet de sa demande.
-   - ## Analyse narrative de la chronologie : Raconte le parcours du candidat de manière fluide. ANALYSE LES DÉLAIS entre les événements (ex: délai entre l'arrivée et le début des études, durée entre une intention de refus et la réponse).
-   - ## Points de vigilance stratégiques : Identifie les risques potentiels basés sur les dates (délais trop courts, interruptions trop longues, validité expirée).
-   - ## Recommandations prioritaires : Liste les actions concrètes.
-4. IMPORTANT : Ne mentionne JAMAIS que ce rapport est généré par une IA.
-5. Langue : Français de France (ou Québec).
-6. Format : Markdown.
+CONSIGNES DE SÉPARATION STRICTE :
+1. Titre : # Analyse de conformité du dossier de CAQ
+2. Focus exclusif : Évalue la conformité du dossier de candidature présent (documents, seuils, formulaires).
+3. INTERDICTION : Ne mélange PAS l'analyse historique du parcours avec ce diagnostic documentaire.
+4. INTERDICTION : Ne mentionne PAS les événements de la chronologie (CAQ passés, dates d'entrée, etc.). Concentre-toi sur le dossier "statique".
+5. Structure :
+   - ## Synthèse de la demande : Résume l'objet du dossier actuel.
+   - ## Diagnostic de conformité : Analyse les points validés et les lacunes documentaires.
+   - ## Recommandations immédiates : Liste les actions pour sécuriser ce dépôt précis.
+6. IMPORTANT : Ne mentionne PAS l'IA.
+7. Format : Markdown.
 `;
 
     try {
         const result = await model.generateContent(prompt);
-        const response = await result.response;
-        return response.text();
+        return result.response.text();
     } catch (error) {
-        console.error("Erreur Gemini Détaillée:", error);
-        if (error.message?.includes('404')) {
-            throw new Error("Le service d'analyse narrative rencontre une erreur de configuration (Modèle introuvable).");
-        }
-        throw new Error("Le service d'analyse narrative est temporairement indisponible.");
+        console.error("Gemini Dossier Error:", error);
+        throw new Error("Impossible de générer l'analyse du dossier.");
+    }
+}
+
+/**
+ * TYPE 2: Chronology / Path Analysis Report
+ * Focuses on evaluating the student's historical consistency and compliance over time.
+ */
+export async function generateChronologyReport(dossierData, events) {
+    if (!genAI) throw new Error("Service indisponible.");
+
+    // Strip "Finance à vérifier" or other current application statuses from the category for the audit
+    const cleanCategory = (dossierData.category || '').split('(')[0].trim();
+
+    const eventsList = (events || []).map(e => {
+        const typeLabel = EVENT_TYPE_LABELS[e.type] || e.type;
+        const mainTitle = e.title || typeLabel;
+        const submission = e.submissionDate ? `[Date de dépôt/demande : ${e.submissionDate}]` : '';
+        const validity = (e.start && e.end) ? `[Période effective/validité : du ${e.start} au ${e.end}]` : (e.start ? `[Date d'événement : ${e.start}]` : '');
+        const role = e.category === 'ADM' ? 'Administratif/MIFI' : 'Candidat';
+        const notes = e.note ? ` - Note : ${e.note}` : '';
+
+        return `- ${mainTitle} (${role}) | Type: ${typeLabel} ${submission} ${validity}${notes}`;
+    }).join('\n');
+
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
+    const prompt = `
+Tu es un Expert Conseil en Immigration Senior spécialisé dans l'analyse de parcours.
+Ton rôle est de rédiger un "Audit de parcours et chronologie migratoire".
+
+DONNÉES CHRONOLOGIQUES À ANALYSER (BRUTES) :
+${eventsList || "Aucune donnée chronologique."}
+
+CONSIGNES DE SÉPARATION ET PRÉCISION :
+1. Titre : # Expertise de parcours et continuité historique
+2. RÈGLE D'OR : Ne confonds PAS les "Demandes" (Date de dépôt) et les "Octrois" (Période de validité). 
+   - La date de dépôt marque le début d'un processus.
+   - La période de validité (début/fin) marque l'autorisation effective.
+   - Un délai important entre les deux est un temps de traitement.
+3. INTERDICTION : Si un événement mentionne une date de dépôt en 2017 mais qu'un octroi commence en 2023, n'invente pas de validité entre les deux. Analyse le "trou" comme une période sans statut ou une interruption.
+4. Focus exclusif : Analyse UNIQUEMENT la cohérence du parcours dans le temps (le passé). Discute des délais d'entrée, des ruptures de statut et des enchaînements logiques.
+5. NE mentionne PAS le profil actuel du candidat (âge, niveau d'études actuel) sauf si cela ressort directement de l'historique des événements fournis.
+6. Structure :
+   - ## Reconstitution narrative : Raconte le parcours passé de manière fluide en respectant la nuance Demande vs Octroi.
+   - ## Analyse des délais et conformité : Commente spécifiquement les temps de traitement et les interruptions.
+   - ## Points de vigilance historiques : Identifie les risques (ex: entrée tardive, CAQ expiré sans renouvellement immédiat).
+7. IMPORTANT : Ne mentionne PAS l'IA.
+8. Format : Markdown.
+`;
+
+    try {
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+    } catch (error) {
+        console.error("Gemini Chronology Error:", error);
+        throw new Error("Impossible de générer l'audit de chronologie.");
     }
 }
