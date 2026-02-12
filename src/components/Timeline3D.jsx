@@ -186,7 +186,8 @@ const Timeline3D = ({ events = [], onBack }) => {
             laneItems.forEach(item => {
                 const rangeStart = item.startDate || item.anchorDate;
                 const rangeEnd = item.endDate || item.startDate || item.anchorDate;
-                let trackIndex = trackEnds.findIndex(endDate => rangeStart >= endDate);
+                // Force separate tracks for even immediate sequences or same-day events
+                let trackIndex = trackEnds.findIndex(endDate => rangeStart > endDate);
                 if (trackIndex === -1) {
                     trackIndex = trackEnds.length;
                     trackEnds.push(rangeEnd);
@@ -230,13 +231,13 @@ const Timeline3D = ({ events = [], onBack }) => {
         scene.background = new THREE.Color(0x0b1220);
         scene.fog = new THREE.Fog(0x0b1220, 40, 220);
 
-        const desiredLength = 120;
-        const scale = Math.min(0.35, Math.max(0.04, desiredLength / totalDays));
+        const desiredLength = 400; // Increased spacing for chronological clarity
+        const scale = Math.min(1.0, Math.max(0.08, desiredLength / totalDays));
         const timelineLength = totalDays * scale;
         const laneSpacing = 7;
         const laneOffset = ((LANE_DEFS.length - 1) * laneSpacing) / 2;
         const baseY = 0.55;
-        const trackSpacing = 0.7;
+        const trackSpacing = 2.0; // Increased to ensure enough vertical gap between L/R labels
 
         const dateToZ = date => -differenceInDays(date, minDate) * scale;
         const laneX = laneIndex => laneIndex * laneSpacing - laneOffset;
@@ -247,9 +248,9 @@ const Timeline3D = ({ events = [], onBack }) => {
             return baseY + trackIndex * trackSpacing - offset;
         };
 
-        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-        camera.position.set(0, 16, 48);
-        camera.lookAt(0, 0, -timelineLength / 2);
+        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2500);
+        camera.position.set(0, 25, 65);
+        camera.lookAt(0, 0, -timelineLength / 3);
 
         const renderer = new THREE.WebGLRenderer({
             canvas: canvasRef.current,
@@ -774,6 +775,17 @@ const Timeline3D = ({ events = [], onBack }) => {
 
                     const scale = Math.max(0.4, Math.min(1, 35 / (label.distance || 35)));
 
+                    const isRequest = title.includes('Demande');
+                    const labelStyle = isRequest ? {
+                        transform: `translate(calc(-100% - 24px), -50%) scale(${scale})`,
+                        textAlign: 'right',
+                        transformOrigin: 'right center'
+                    } : {
+                        transform: `translate(24px, -50%) scale(${scale})`,
+                        textAlign: 'left',
+                        transformOrigin: 'left center'
+                    };
+
                     return (
                         <div
                             key={label.id}
@@ -781,22 +793,27 @@ const Timeline3D = ({ events = [], onBack }) => {
                                 position: 'absolute',
                                 left: label.x,
                                 top: label.y,
-                                transform: `translate(18px, -50%) scale(${scale})`,
-                                transformOrigin: 'left center',
+                                ...labelStyle,
                                 zIndex: 1500 + label.order,
-                                background: 'rgba(15, 23, 42, 0.94)',
-                                backdropFilter: 'blur(8px)',
-                                padding: '10px 12px',
+                                background: 'rgba(15, 23, 42, 0.96)',
+                                backdropFilter: 'blur(10px)',
+                                padding: '10px 14px',
                                 borderRadius: '12px',
-                                border: `1px solid ${item.lane.color}88`,
+                                border: `1px solid ${item.lane.color}cc`,
                                 color: 'white',
                                 minWidth: '180px',
-                                maxWidth: '220px',
-                                boxShadow: '0 8px 20px -8px rgba(15, 23, 42, 0.8)',
-                                opacity: Math.max(0.4, 1 + label.depth / 100)
+                                maxWidth: '240px',
+                                boxShadow: '0 8px 25px -10px rgba(0, 0, 0, 0.7)',
+                                opacity: 1
                             }}
                         >
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: isRequest ? 'flex-end' : 'space-between',
+                                gap: '8px',
+                                flexDirection: isRequest ? 'row-reverse' : 'row'
+                            }}>
                                 <span style={{
                                     fontSize: '9px',
                                     textTransform: 'uppercase',
