@@ -3,6 +3,23 @@ import { format, differenceInDays, addMonths, subMonths, startOfMonth, endOfMont
 import { fr } from 'date-fns/locale';
 import { GraduationCap } from 'lucide-react';
 
+const EVENT_LABELS = {
+    'CAQ': 'Certificat (CAQ)',
+    'CAQ_REFUSAL': 'Refus de CAQ',
+    'INTENT_REFUSAL': 'Intention de Refus',
+    'INTENT_CANCEL': 'Intention d\'Annulation',
+    'CAQ_CANCEL': 'Annulation du CAQ',
+    'FRAUD_REJECTION': 'Rejet pour Faux et Trompeur',
+    'DOCS_SENT': 'Envoi de Documents',
+    'INTERVIEW': 'Convocation Entrevue',
+    'ENTRY': 'Entrée au pays',
+    'EXIT': 'Sortie du territoire',
+    'WORK_PERMIT': 'Permis Travail/Études',
+    'STUDIES': 'Début des Études',
+    'INSURANCE': 'Assurance Maladie',
+    'MEDICAL': 'Maladie / Congé Médical'
+};
+
 const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgram, customEvents = [] }) => {
     // Calculer la plage globale
     // Priorise les paramètres explicites (startDate/endDate), sinon utilise tous les événements disponibles
@@ -117,9 +134,15 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
                                         <div
                                             className={`timeline-bar custom-bar ${event.type.toLowerCase()} ${event.category === 'ADM' ? 'adm-event' : 'usr-event'}`}
                                             style={{ left: `${getOffset(event.start)}%`, width: `${getWidth(event.start, event.end)}%` }}
+                                            title={event.label || EVENT_LABELS[event.type] || event.type}
                                         >
                                             <div className="bar-content">
-                                                <span className="bar-label">{event.label || event.type}</span>
+                                                <span className="bar-label">{event.label || EVENT_LABELS[event.type] || event.type}</span>
+                                                {event.type === 'STUDIES' && event.level && (
+                                                    <span className="linked-tag" style={{ fontSize: '0.65rem', fontWeight: 700, opacity: 1, marginTop: '2px' }}>
+                                                        {event.level}
+                                                    </span>
+                                                )}
                                                 {event.linkedProgram && <span className="linked-tag"><GraduationCap size={10} /> {event.linkedProgram}</span>}
                                                 {event.isOutsideCanada && <span className="linked-tag" style={{ color: '#ed8936' }}>📍 Hors Canada</span>}
                                             </div>
@@ -143,32 +166,25 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
                                                         style={alignmentStyles}
                                                     >
                                                         {(() => {
-                                                            const labels = {
-                                                                'CAQ': 'Certificat (CAQ)',
-                                                                'CAQ_REFUSAL': 'Refus de CAQ',
-                                                                'INTENT_REFUSAL': 'Intention de Refus',
-                                                                'INTENT_CANCEL': 'Intention d\'Annulation',
-                                                                'CAQ_CANCEL': 'Annulation du CAQ',
-                                                                'FRAUD_REJECTION': 'Rejet pour Faux et Trompeur',
-                                                                'DOCS_SENT': 'Envoi de Documents',
-                                                                'INTERVIEW': 'Convocation Entrevue',
-                                                                'ENTRY': 'Entrée au pays',
-                                                                'EXIT': 'Sortie du territoire',
-                                                                'WORK_PERMIT': 'Permis Travail/Études',
-                                                                'STUDIES': 'Début des Études',
-                                                                'INSURANCE': 'Assurance Maladie',
-                                                                'MEDICAL': 'Maladie / Congé Médical'
-                                                            };
+                                                            const typeLabel = EVENT_LABELS[event.type] || event.type;
+                                                            // For student events (CAQ, WORK_PERMIT, STUDIES), prepend "Demande de " if it's a pending request or marker
+                                                            // The user asked to "take the title of the event" and add "Demande de" for student types
 
-                                                            const typeLabel = labels[event.type] || event.type;
-                                                            const displayLabel = event.label || typeLabel;
+                                                            let displayLabel = event.label || typeLabel;
 
-                                                            if (!hasDecision && ['CAQ', 'WORK_PERMIT'].includes(event.type)) {
-                                                                if (displayLabel.toLowerCase().startsWith('demande de')) {
-                                                                    return <span className="pending-tag">{displayLabel}</span>;
+                                                            // Check if it's a student event that implies a request process
+                                                            // AND it's a marker (meaning usually the submission point or single date event)
+                                                            // OR specifically requested for student types
+                                                            if (['CAQ', 'WORK_PERMIT'].includes(event.type)) {
+                                                                // If it's a pending request (marker with no decision)
+                                                                if (!hasDecision) {
+                                                                    displayLabel = `Demande de ${typeLabel}`;
                                                                 }
-                                                                return <><span className="pending-tag">Demande de </span>{displayLabel}</>;
+                                                                // If it has a label (manual) we assume user knows what they did, but we removed manual input.
+                                                                // So we rely on typeLabel.
                                                             }
+
+                                                            // For ADM events, we just use the title (already handled by typeLabel assignment)
 
                                                             return displayLabel;
                                                         })()}
@@ -200,8 +216,8 @@ const Timeline = ({ startDate, endDate, caqStart, caqEnd, entryDate, isNewProgra
                 .program-badge { background: #e67e22; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
                 
                 .timeline-main { display: flex; flex-direction: column; gap: 12px; }
-                .timeline-track { height: 36px; background: #f1f5f9; border-radius: 8px; position: relative; overflow: visible; border: 1px solid var(--border); }
-                .base-track { height: 44px; background: #e2e8f0; border-width: 2px; }
+                .timeline-track { height: 42px; background: #f1f5f9; border-radius: 8px; position: relative; overflow: visible; border: 1px solid var(--border); }
+                .base-track { height: 48px; background: #e2e8f0; border-width: 2px; }
                 
                 .timeline-bar { position: absolute; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 6px; overflow: hidden; white-space: nowrap; padding: 0 8px; box-shadow: var(--shadow-sm); z-index: 2; }
                 .caq-bar { background: var(--primary); color: white; }

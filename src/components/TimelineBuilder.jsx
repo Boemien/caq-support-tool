@@ -27,7 +27,7 @@ const TimelineBuilder = ({ events, setEvents }) => {
         type: 'CAQ',
         start: '',
         end: '',
-        label: '',
+        // label removed
         note: '',
         linkedProgram: '',
         level: '', // New field for study level
@@ -37,14 +37,30 @@ const TimelineBuilder = ({ events, setEvents }) => {
 
     const addEvent = () => {
         if (!newEvent.start && !newEvent.submissionDate) return;
+
+        // Validation: Level is mandatory for CAQ and STUDIES
+        if (['CAQ', 'STUDIES'].includes(newEvent.type) && !newEvent.level) {
+            alert("Le champ 'Niveau' est obligatoire pour ce type d'événement.");
+            return;
+        }
+
         const typeInfo = EVENT_TYPES.find(t => t.value === newEvent.type);
-        setEvents([...events, {
+        const newEventWithMeta = {
             ...newEvent,
             id: Date.now(),
             legalRef: typeInfo.ref,
             category: typeInfo.category // Save category for later use
-        }]);
-        setNewEvent({ type: 'CAQ', start: '', end: '', label: '', note: '', linkedProgram: '', level: '', isOutsideCanada: false, submissionDate: '' });
+        };
+
+        // Add event and sort chronologically
+        const updatedEvents = [...events, newEventWithMeta].sort((a, b) => {
+            const dateA = new Date(a.start || a.submissionDate || a.end);
+            const dateB = new Date(b.start || b.submissionDate || b.end);
+            return dateA - dateB;
+        });
+
+        setEvents(updatedEvents);
+        setNewEvent({ type: 'CAQ', start: '', end: '', note: '', linkedProgram: '', level: '', isOutsideCanada: false, submissionDate: '' });
     };
 
     const removeEvent = (id) => {
@@ -74,15 +90,6 @@ const TimelineBuilder = ({ events, setEvents }) => {
                                     {EVENT_TYPES.filter(t => t.category === 'USR').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                                 </optgroup>
                             </select>
-                        </div>
-                        <div className="form-group">
-                            <label>Libellé / Description</label>
-                            <input
-                                type="text"
-                                placeholder="ex: CAQ Session Automne"
-                                value={newEvent.label || ''}
-                                onChange={(e) => setNewEvent({ ...newEvent, label: e.target.value })}
-                            />
                         </div>
                     </div>
 
@@ -128,18 +135,26 @@ const TimelineBuilder = ({ events, setEvents }) => {
                                     value={newEvent.linkedProgram}
                                     onChange={(e) => setNewEvent({ ...newEvent, linkedProgram: e.target.value })}
                                 />
-                                <select
-                                    value={newEvent.level || ''}
-                                    onChange={(e) => setNewEvent({ ...newEvent, level: e.target.value })}
-                                    style={{ padding: '0.6rem', borderRadius: '8px', border: '1px solid #ccc' }}
-                                >
-                                    <option value="">-- Niveau --</option>
-                                    <option value="Primaire">Primaire</option>
-                                    <option value="Secondaire">Secondaire</option>
-                                    <option value="Collégial">Collégial</option>
-                                    <option value="Professionnel">Professionnel</option>
-                                    <option value="Universitaire">Universitaire</option>
-                                </select>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <select
+                                        value={newEvent.level || ''}
+                                        onChange={(e) => setNewEvent({ ...newEvent, level: e.target.value })}
+                                        style={{
+                                            padding: '0.6rem',
+                                            borderRadius: '8px',
+                                            border: !newEvent.level ? '2px solid #e53e3e' : '1px solid #ccc',
+                                            backgroundColor: !newEvent.level ? '#fff5f5' : 'white'
+                                        }}
+                                        title="Ce champ est obligatoire"
+                                    >
+                                        <option value="">-- Niveau (Obligatoire) --</option>
+                                        <option value="Primaire">Primaire</option>
+                                        <option value="Secondaire">Secondaire</option>
+                                        <option value="Collégial">Collégial</option>
+                                        <option value="Professionnel">Professionnel</option>
+                                        <option value="Universitaire">Universitaire</option>
+                                    </select>
+                                </div>
                             </div>
                             {newEvent.type === 'CAQ' && (
                                 <div style={{ marginTop: '0.5rem' }}>
@@ -216,40 +231,54 @@ const TimelineBuilder = ({ events, setEvents }) => {
                     {events.length === 0 ? (
                         <p className="empty-msg">Aucun événement dans la chronologie.</p>
                     ) : (
-                        events.map(event => (
-                            <div key={event.id} className={`event-card ${event.type.toLowerCase()}`}>
-                                <div className="event-info">
-                                    <div className="event-main">
-                                        <strong>{EVENT_TYPES.find(t => t.value === event.type)?.label}</strong>
-                                        {event.label && <span className="event-desc"> - {event.label}</span>}
-                                        {event.legalRef && <span className="legal-badge"><Scale size={10} /> {event.legalRef}</span>}
-                                        {event.category === 'ADM' && <span className="category-badge adm">ADMINISTRATIF</span>}
-                                        {event.category === 'USR' && <span className="category-badge usr">CANDIDAT</span>}
-                                    </div>
-                                    <div className="event-dates">
-                                        {event.submissionDate && <span className="sub-date">Demande : {event.submissionDate} ➜ </span>}
-                                        {event.start} {event.end ? ` au ${event.end}` : ''}
-                                    </div>
-                                    {event.linkedProgram && (
-                                        <div className="linked-info">
-                                            <GraduationCap size={12} /> Destiné au programme : <strong>{event.linkedProgram}</strong>
-                                            {event.level && <span style={{ marginLeft: '4px', opacity: 0.8 }}>({event.level})</span>}
-                                            {event.isOutsideCanada && <span className="outside-tag ml-4">📍 Hors Canada</span>}
+                        events.map(event => {
+                            const typeInfo = EVENT_TYPES.find(t => t.value === event.type);
+                            const isDemande = ['CAQ', 'WORK_PERMIT', 'DOCS_SENT'].includes(event.type) && !event.start;
+
+                            let displayLabel = typeInfo?.label || event.type;
+                            if (isDemande) {
+                                if (event.type === 'CAQ') displayLabel = '📜 Demande de CAQ';
+                                if (event.type === 'WORK_PERMIT') displayLabel = '🪪 Demande de Permis';
+                            } else if (['CAQ', 'WORK_PERMIT'].includes(event.type) && event.start) {
+                                if (event.type === 'CAQ') displayLabel = '📜 Certificat (CAQ) Obtenu';
+                                if (event.type === 'WORK_PERMIT') displayLabel = '🪪 Permis Obtenu';
+                            }
+
+                            return (
+                                <div key={event.id} className={`event-card ${event.type.toLowerCase()} ${isDemande ? 'is-demande' : ''}`}>
+                                    <div className="event-info">
+                                        <div className="event-main">
+                                            <strong>{displayLabel}</strong>
+                                            {event.label && <span className="event-desc"> - {event.label}</span>}
+                                            {event.legalRef && <span className="legal-badge"><Scale size={10} /> {event.legalRef}</span>}
+                                            {event.category === 'ADM' && <span className="category-badge adm">ADMINISTRATIF</span>}
+                                            {event.category === 'USR' && <span className="category-badge usr">CANDIDAT</span>}
                                         </div>
-                                    )}
-                                    {((event.type === 'CAQ' && event.isOutsideCanada) || event.level) && !event.linkedProgram && (
-                                        <div className="linked-info">
-                                            {event.level && <span style={{ marginRight: '6px' }}>🎓 {event.level}</span>}
-                                            {event.type === 'CAQ' && event.isOutsideCanada && <span className="outside-tag">📍 Demande Hors Canada</span>}
+                                        <div className="event-dates">
+                                            {event.submissionDate && <span className="sub-date">Demande : {event.submissionDate} ➜ </span>}
+                                            {event.start} {event.end ? ` au ${event.end}` : ''}
                                         </div>
-                                    )}
-                                    {event.note && <p className="event-note">{event.note}</p>}
+                                        {event.linkedProgram && (
+                                            <div className="linked-info">
+                                                <GraduationCap size={12} /> Destiné au programme : <strong>{event.linkedProgram}</strong>
+                                                {event.level && <span style={{ marginLeft: '4px', opacity: 0.8 }}>({event.level})</span>}
+                                                {event.isOutsideCanada && <span className="outside-tag ml-4">📍 Hors Canada</span>}
+                                            </div>
+                                        )}
+                                        {((event.type === 'CAQ' && event.isOutsideCanada) || event.level) && !event.linkedProgram && (
+                                            <div className="linked-info">
+                                                {event.level && <span style={{ marginRight: '6px' }}>🎓 {event.level}</span>}
+                                                {event.type === 'CAQ' && event.isOutsideCanada && <span className="outside-tag">📍 Demande Hors Canada</span>}
+                                            </div>
+                                        )}
+                                        {event.note && <p className="event-note">{event.note}</p>}
+                                    </div>
+                                    <button className="btn-icon delete" onClick={() => removeEvent(event.id)}>
+                                        <Trash2 size={16} />
+                                    </button>
                                 </div>
-                                <button className="btn-icon delete" onClick={() => removeEvent(event.id)}>
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             </section>
@@ -277,6 +306,15 @@ const TimelineBuilder = ({ events, setEvents }) => {
                 .event-card.travel { border-left-color: #718096; background: #f8fafc; border-style: dashed; }
                 .event-card.entry { border-left-color: #e67e22; background: #fffcf5; }
                 .event-card.intent_refusal { border-left-color: #e74c3c; background: #fff5f5; }
+                
+                .event-card.is-demande {
+                    border-style: dashed;
+                    background: #fdfdfd;
+                    opacity: 0.9;
+                }
+                .event-card.is-demande.caq { border-left-color: #a78bfa; }
+                .event-card.is-demande.work_permit { border-left-color: #d8b4fe; }
+
                 
                 .event-main { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
                 .event-desc { font-size: 0.9rem; color: #666; }

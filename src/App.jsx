@@ -301,9 +301,9 @@ function App() {
                                     <FileText size={24} color="#3182ce" />
                                 </div>
                                 <div>
-                                    <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#2d3748' }}>Analyse d'Admissibilit&eacute; CAQ</h2>
+                                    <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#2d3748' }}>Analyse d'admissibilité du CAQ</h2>
                                     <p style={{ margin: '4px 0 0', color: '#718096', fontSize: '0.95rem' }}>
-                                        Simulateur professionnel pour &eacute;valuer la conformit&eacute; d'un dossier avant soumission au MIFI.
+                                        Simulateur professionnel pour évaluer la conformité d'un dossier avant soumission au MIFI.
                                     </p>
                                 </div>
                             </div>
@@ -876,7 +876,7 @@ function App() {
                                     <History size={24} color="#38a169" />
                                 </div>
                                 <div>
-                                    <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#2d3748' }}>Reconstitution du Parcours Migratoire</h2>
+                                    <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#2d3748' }}>Reconstitution du Parcours étudiant</h2>
                                     <p style={{ margin: '4px 0 0', color: '#718096', fontSize: '0.95rem' }}>
                                         Outil de chronologie interactive pour visualiser l'historique des statuts et d&eacute;tecter les ruptures de conformit&eacute;.
                                     </p>
@@ -945,27 +945,31 @@ function App() {
                                             <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                                                 <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>ALERTES</div>
                                                 <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>
-                                                    {timelineAnalysis.controls.length + timelineAnalysis.insuranceIssues.length}
+                                                    {(timelineAnalysis.allAlerts || []).length}
                                                 </div>
                                                 <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Points à vérifier</div>
                                             </div>
                                         </div>
 
-                                        {timelineAnalysis.controls.map((ctrl, i) => (
-                                            <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', fontSize: '0.9rem', color: '#e53e3e', background: '#fef2f2', padding: '8px', borderRadius: '6px' }}>
-                                                <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                                                <span>{ctrl.message}</span>
+                                        {(timelineAnalysis.allAlerts || []).map((alert, i) => (
+                                            <div key={i} style={{
+                                                display: 'flex',
+                                                gap: '8px',
+                                                marginBottom: '8px',
+                                                fontSize: '0.9rem',
+                                                color: alert.type === 'error' ? '#e53e3e' : alert.type === 'warning' ? '#d97706' : '#059669',
+                                                background: alert.type === 'error' ? '#fef2f2' : alert.type === 'warning' ? '#fffbeb' : '#ecfdf5',
+                                                padding: '8px',
+                                                borderRadius: '6px'
+                                            }}>
+                                                {alert.type === 'error' ? <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '2px' }} /> :
+                                                    alert.type === 'warning' ? <ShieldAlert size={16} style={{ flexShrink: 0, marginTop: '2px' }} /> :
+                                                        <CheckCircle2 size={16} style={{ flexShrink: 0, marginTop: '2px' }} />}
+                                                <span>{alert.message}</span>
                                             </div>
                                         ))}
 
-                                        {timelineAnalysis.insuranceIssues.map((issue, i) => (
-                                            <div key={`ins-${i}`} style={{ display: 'flex', gap: '8px', marginBottom: '8px', fontSize: '0.9rem', color: '#d97706', background: '#fffbeb', padding: '8px', borderRadius: '6px' }}>
-                                                <ShieldAlert size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                                                <span>{issue.message}</span>
-                                            </div>
-                                        ))}
-
-                                        {timelineAnalysis.controls.length === 0 && timelineAnalysis.insuranceIssues.length === 0 && (
+                                        {(timelineAnalysis.allAlerts || []).length === 0 && (
                                             <div style={{ display: 'flex', gap: '8px', fontSize: '0.9rem', color: '#059669', background: '#ecfdf5', padding: '8px', borderRadius: '6px' }}>
                                                 <CheckCircle2 size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
                                                 <span>Aucune anomalie chronologique majeure détectée.</span>
@@ -1140,7 +1144,7 @@ function App() {
                                                     <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                                                         <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Anomalies</div>
                                                         <div style={{ fontSize: '2rem', fontWeight: 800, lineHeight: 1.2 }}>
-                                                            {timelineAnalysis.controls.length + timelineAnalysis.insuranceIssues.length}
+                                                            {(timelineAnalysis.allAlerts || []).length}
                                                         </div>
                                                         <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Points d'attention</div>
                                                     </div>
@@ -1154,21 +1158,26 @@ function App() {
                                                 </div>
 
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                    {timelineAnalysis.controls.map((ctrl, i) => (
-                                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.95rem', color: '#b91c1c', background: '#fef2f2', padding: '12px', borderRadius: '8px', border: '1px solid #fecaca' }}>
-                                                            <AlertTriangle size={20} style={{ flexShrink: 0 }} />
-                                                            <span style={{ fontWeight: 500 }}>{ctrl.message}</span>
+                                                    {(timelineAnalysis.allAlerts || []).map((alert, i) => (
+                                                        <div key={i} style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '12px',
+                                                            fontSize: '0.95rem',
+                                                            color: alert.type === 'error' ? '#b91c1c' : alert.type === 'warning' ? '#c2410c' : '#15803d',
+                                                            background: alert.type === 'error' ? '#fef2f2' : alert.type === 'warning' ? '#fff7ed' : '#f0fdf4',
+                                                            padding: '12px',
+                                                            borderRadius: '8px',
+                                                            border: alert.type === 'error' ? '1px solid #fecaca' : alert.type === 'warning' ? '1px solid #fed7aa' : '1px solid #bbf7d0'
+                                                        }}>
+                                                            {alert.type === 'error' ? <AlertTriangle size={20} style={{ flexShrink: 0 }} /> :
+                                                                alert.type === 'warning' ? <ShieldAlert size={20} style={{ flexShrink: 0 }} /> :
+                                                                    <CheckCircle2 size={20} style={{ flexShrink: 0 }} />}
+                                                            <span style={{ fontWeight: 500 }}>{alert.message}</span>
                                                         </div>
                                                     ))}
 
-                                                    {timelineAnalysis.insuranceIssues.map((issue, i) => (
-                                                        <div key={`ins-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.95rem', color: '#c2410c', background: '#fff7ed', padding: '12px', borderRadius: '8px', border: '1px solid #fed7aa' }}>
-                                                            <ShieldAlert size={20} style={{ flexShrink: 0 }} />
-                                                            <span style={{ fontWeight: 500 }}>{issue.message}</span>
-                                                        </div>
-                                                    ))}
-
-                                                    {timelineAnalysis.controls.length === 0 && timelineAnalysis.insuranceIssues.length === 0 && (
+                                                    {(timelineAnalysis.allAlerts || []).length === 0 && (
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1rem', color: '#15803d', background: '#f0fdf4', padding: '16px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
                                                             <CheckCircle2 size={24} style={{ flexShrink: 0 }} />
                                                             <div>

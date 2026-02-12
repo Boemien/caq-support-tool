@@ -1,6 +1,23 @@
-import { differenceInDays, addDays, isAfter, isBefore, parseISO, isValid, format } from 'date-fns';
+import { differenceInDays, addDays, isAfter, isBefore, parseISO, isValid, format, differenceInMonths } from 'date-fns';
 
 const formatDate = (date) => isValid(date) ? format(date, 'dd/MM/yyyy') : '??';
+
+const safeParseDate = (dateStr) => {
+    if (dateStr === 0) return new Date(0);
+    if (!dateStr) return null;
+    if (dateStr instanceof Date) return dateStr;
+    if (typeof dateStr === 'number') return new Date(dateStr);
+    // Handle YYYY-MM-DD strings safely
+    if (typeof dateStr === 'string' && dateStr.includes('-')) {
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+            const [y, m, d] = parts.map(Number);
+            // new Date(y, m-1, d) creates a local date
+            return new Date(y, m - 1, d);
+        }
+    }
+    return new Date(dateStr);
+};
 
 export const TIMELINE_STATUS = {
     OK: 'ok',
@@ -28,8 +45,8 @@ export function analyzeTimeline(events) {
 
     // 1. Sort events chronologically
     const sortedEvents = [...events].sort((a, b) => {
-        const dateA = new Date(a.submissionDate || a.start || 0);
-        const dateB = new Date(b.submissionDate || b.start || 0);
+        const dateA = safeParseDate(a.submissionDate || a.start || 0);
+        const dateB = safeParseDate(b.submissionDate || b.start || 0);
         return dateA - dateB;
     });
 
@@ -48,8 +65,8 @@ export function analyzeTimeline(events) {
             // Get end date of previous event (approximate based on logic or user input if available)
             // For now, assuming standard duration if no end date provided, or using start date of next event as check
 
-            const prevDate = new Date(prevEvent.submissionDate || prevEvent.start);
-            const currDate = new Date(event.submissionDate || event.start);
+            const prevDate = safeParseDate(prevEvent.submissionDate || prevEvent.start);
+            const currDate = safeParseDate(event.submissionDate || event.start);
 
             const gapDays = differenceInDays(currDate, prevDate);
 
@@ -78,20 +95,167 @@ export function analyzeTimeline(events) {
         }
     });
 
-    // 3. Insurance Coverage (Simplified)
-    // We look for "Preuve d'assurance" or "RAMQ" events
-    const insuranceEvents = sortedEvents.filter(e => e.label.toLowerCase().includes('assurance') || e.label.toLowerCase().includes('ramq'));
+    // 3. Insurance Coverage (Refined)
+    // Find all CAQ periods (validity)
+    const caqPeriods = sortedEvents.filter(e => e.type === 'CAQ' && e.start && e.end);
+
+    // Find entry date (first entry event)
+    const entryEvent = sortedEvents.find(e => e.type === 'ENTRY');
+    const entryDate = entryEvent ? safeParseDate(entryEvent.start || entryEvent.submissionDate) : null;
+
+    // Find all insurance coverage periods
+    const insurancePeriods = sortedEvents
+        .filter(e => e.type === 'INSURANCE' || (e.label && (e.label.toLowerCase().includes('assurance') || e.label.toLowerCase().includes('ramq'))))
+        .map(e => ({
+            start: safeParseDate(e.start || e.submissionDate),
+            end: e.end ? safeParseDate(e.end) : addDays(safeParseDate(e.start || e.submissionDate), 365) // Default 1 year if no end
+        }));
+
+    // Define studyEvents and caqEvents for use in insurance and consistency checks
+    const studyEvents = sortedEvents.filter(e => e.type === 'STUDIES' && e.start && e.end);
+    const caqEvents = sortedEvents.filter(e => e.type === 'CAQ' && e.start && e.end);
+
+
+    // 3. Insurance Coverage (LINKED TO ACTUAL STUDIES)
+    // CRITICAL CHANGE: Only check insurance for CAQs where studies actually occurred
+    // This prevents false warnings for CAQs that were obtained but never used for studies
 
     // Only require insurance if there is an indication of presence in Canada
-    // (Entry, Studies started, or Work Permit activated)
     const hasPresence = sortedEvents.some(e => ['ENTRY', 'STUDIES', 'WORK_PERMIT'].includes(e.type));
 
-    if (hasPresence && insuranceEvents.length === 0) {
+    if (studyEvents.length > 0 && hasPresence) {
+        // For each study period, find the covering CAQ and check insurance for that period
+        studyEvents.forEach(study => {
+            const sStart = new Date(study.start);
+            const sEnd = new Date(study.end);
+            if (!isValid(sStart) || !isValid(sEnd)) return;
+
+            // Find the CAQ that covers this study (matching level and overlapping dates)
+            const coveringCAQ = caqEvents.find(caq => {
+                const cStart = safeParseDate(caq.start);
+                const cEnd = safeParseDate(caq.end);
+                return caq.level === study.level && (cStart <= sEnd && cEnd >= sStart);
+            });
+
+            if (!coveringCAQ) {
+                // No matching CAQ found - this is already reported in program consistency check
+                return;
+            }
+
+            const caqStart = safeParseDate(coveringCAQ.start);
+            const caqEnd = safeParseDate(coveringCAQ.end);
+
+            // Determine effective required start date for insurance
+            let requiredStart = caqStart;
+            if (entryDate && isAfter(entryDate, caqStart)) {
+                requiredStart = entryDate;
+            }
+
+            // IMPORTANT: Skip if CAQ expired before entry to Canada
+            if (entryDate && isBefore(caqEnd, entryDate)) {
+                return; // Skip this CAQ entirely
+            }
+
+            // If requiredStart > caqEnd, no insurance needed
+            if (isAfter(requiredStart, caqEnd)) return;
+
+            // Find insurance periods that overlap with [requiredStart, caqEnd]
+            const relevantInsurance = insurancePeriods
+                .filter(ins => (isBefore(ins.start, caqEnd) && isAfter(ins.end, requiredStart)))
+                .sort((a, b) => a.start - b.start);
+
+            const caqInfo = coveringCAQ.level ? `${coveringCAQ.level}${coveringCAQ.linkedProgram ? ' (' + coveringCAQ.linkedProgram + ')' : ''}` : 'Non spécifié';
+
+            if (relevantInsurance.length === 0) {
+                report.insuranceIssues.push({
+                    type: TIMELINE_STATUS.WARNING,
+                    message: `CAQ obtenu pour le niveau ${caqInfo} du ${formatDate(caqStart)} au ${formatDate(caqEnd)} entièrement sans preuve d'assurance.`,
+                    date: caqStart
+                });
+                report.score -= 15;
+            } else {
+                // Check for gaps
+                let currentCheck = requiredStart;
+
+                // Merge overlapping insurance periods first to simplify gap detection
+                const mergedInsurance = [];
+                if (relevantInsurance.length > 0) {
+                    let currentPeriod = relevantInsurance[0];
+                    for (let i = 1; i < relevantInsurance.length; i++) {
+                        const nextPeriod = relevantInsurance[i];
+                        if (isBefore(nextPeriod.start, currentPeriod.end) || differenceInDays(nextPeriod.start, currentPeriod.end) <= 1) {
+                            // Overlap or adjacent -> merge
+                            if (isAfter(nextPeriod.end, currentPeriod.end)) {
+                                currentPeriod.end = nextPeriod.end;
+                            }
+                        } else {
+                            mergedInsurance.push(currentPeriod);
+                            currentPeriod = nextPeriod;
+                        }
+                    }
+                    mergedInsurance.push(currentPeriod);
+                }
+
+                // Now check gaps against merged periods
+                mergedInsurance.forEach(period => {
+                    // If insurance starts after current check point -> gap detected
+                    if (isAfter(period.start, currentCheck) && differenceInDays(period.start, currentCheck) > 15) {
+                        report.insuranceIssues.push({
+                            type: TIMELINE_STATUS.WARNING,
+                            message: `CAQ obtenu pour le niveau ${caqInfo} du ${formatDate(caqStart)} : Rupture d'assurance entre ${formatDate(currentCheck)} et ${formatDate(period.start)}.`,
+                            date: currentCheck
+                        });
+                        report.score -= 5;
+                    }
+                    // Move check point to end of current insurance period if it's later
+                    if (isAfter(period.end, currentCheck)) {
+                        currentCheck = period.end;
+                    }
+                });
+
+                // Check final gap after last insurance
+                if (isBefore(currentCheck, caqEnd) && differenceInDays(caqEnd, currentCheck) > 15) {
+                    report.insuranceIssues.push({
+                        type: TIMELINE_STATUS.WARNING,
+                        message: `CAQ obtenu pour le niveau ${caqInfo} du ${formatDate(caqStart)} : Rupture d'assurance à la fin, entre ${formatDate(currentCheck)} et ${formatDate(caqEnd)}.`,
+                        date: currentCheck
+                    });
+                    report.score -= 5;
+                }
+            }
+        });
+    } else if (hasPresence && insurancePeriods.length === 0) {
+        // Fallback if no CAQ but presence exists
         report.insuranceIssues.push({
             type: TIMELINE_STATUS.WARNING,
-            message: "Aucune preuve d'assurance détectée malgré une présence au Canada."
+            message: "Aucune preuve d'assurance détectée malgré une présence au Canada (sans CAQ lié)."
         });
         report.score -= 10;
+    }
+
+    // 4. Post-Arrival Delay Check (Entry -> Studies)
+    if (entryDate && studyEvents.length > 0) {
+        // Find the first study period AFTER arrival
+        const studiesAfterEntry = studyEvents
+            .map(s => ({ ...s, startDate: safeParseDate(s.start) }))
+            .filter(s => isAfter(s.startDate, entryDate))
+            .sort((a, b) => a.startDate - b.startDate);
+
+        if (studiesAfterEntry.length > 0) {
+            const firstStudyAfterEntry = studiesAfterEntry[0];
+            const monthsDelay = differenceInMonths(firstStudyAfterEntry.startDate, entryDate);
+
+            if (monthsDelay >= 1) {
+                const isSerious = monthsDelay >= 3;
+                report.controls.push({
+                    type: isSerious ? TIMELINE_STATUS.ERROR : TIMELINE_STATUS.WARNING,
+                    message: `Délai d'entrée : L'étudiant a commencé ses études ${monthsDelay} mois après son arrivée au pays (Arrivée: ${formatDate(entryDate)}, Études: ${formatDate(firstStudyAfterEntry.startDate)}). (Note: > 1 mois est suspect, > 3 mois est critique)`,
+                    date: firstStudyAfterEntry.startDate
+                });
+                if (isSerious) report.score -= 15;
+                else report.score -= 5;
+            }
+        }
     }
 
     // 4. Refusals Impact
@@ -102,13 +266,13 @@ export function analyzeTimeline(events) {
     // A. Analyze Refusals
     if (refusals.length > 0) {
         refusals.forEach(refusal => {
-            const rDate = new Date(refusal.submissionDate || refusal.start);
+            const rDate = safeParseDate(refusal.submissionDate || refusal.start);
 
             // Check if a NEW CAQ was APPROVED (has start/end dates) AFTER this refusal
             const hasApprovedCAQ = sortedEvents.some(e =>
                 e.type === 'CAQ' &&
                 e.start && e.end && // Must have validity dates (approved)
-                new Date(e.start) > rDate
+                safeParseDate(e.start) > rDate
             );
 
             // Check if a NEW CAQ REQUEST (submission only) exists AFTER this refusal
@@ -116,7 +280,7 @@ export function analyzeTimeline(events) {
                 e.type === 'CAQ' &&
                 e.submissionDate &&
                 !e.start && !e.end && // No validity dates (pending)
-                new Date(e.submissionDate) > rDate
+                safeParseDate(e.submissionDate) > rDate
             );
 
             if (!hasApprovedCAQ && !hasPendingRequest) {
@@ -149,11 +313,11 @@ export function analyzeTimeline(events) {
     // B. Analyze Intents
     if (intents.length > 0) {
         intents.forEach(intent => {
-            const iDate = new Date(intent.submissionDate || intent.start);
+            const iDate = safeParseDate(intent.submissionDate || intent.start);
             // Check if DOCS_SENT exists AFTER intent (Response)
             const hasResponse = sortedEvents.some(e =>
                 e.type === 'DOCS_SENT' &&
-                new Date(e.submissionDate || e.start) > iDate
+                safeParseDate(e.submissionDate || e.start) > iDate
             );
 
             if (!hasResponse) {
@@ -181,11 +345,11 @@ export function analyzeTimeline(events) {
     // Intent to Cancel Analysis
     if (intentCancels.length > 0) {
         intentCancels.forEach(intent => {
-            const iDate = new Date(intent.submissionDate || intent.start);
+            const iDate = safeParseDate(intent.submissionDate || intent.start);
             // Check if DOCS_SENT exists AFTER intent (Response within 60 days)
             const hasResponse = sortedEvents.some(e =>
                 e.type === 'DOCS_SENT' &&
-                new Date(e.submissionDate || e.start) > iDate
+                safeParseDate(e.submissionDate || e.start) > iDate
             );
 
             if (!hasResponse) {
@@ -210,7 +374,7 @@ export function analyzeTimeline(events) {
     if (caqCancels.length > 0) {
         report.score -= (caqCancels.length * 50); // Severe penalty
         caqCancels.forEach(cancel => {
-            const cDate = new Date(cancel.submissionDate || cancel.start);
+            const cDate = safeParseDate(cancel.submissionDate || cancel.start);
             report.controls.push({
                 type: TIMELINE_STATUS.ERROR,
                 message: `🚫 ANNULATION DU CAQ le ${formatDate(cDate)} - Dossier gravement compromis (Art. 59 LIQ).`,
@@ -223,7 +387,7 @@ export function analyzeTimeline(events) {
     if (fraudRejections.length > 0) {
         report.score -= (fraudRejections.length * 60); // Most severe penalty
         fraudRejections.forEach(fraud => {
-            const fDate = new Date(fraud.submissionDate || fraud.start);
+            const fDate = safeParseDate(fraud.submissionDate || fraud.start);
             report.controls.push({
                 type: TIMELINE_STATUS.ERROR,
                 message: `⚖️ REJET POUR FAUX ET TROMPEUR le ${formatDate(fDate)} - Interdiction de 5 ans (Art. 56-57 LIQ).`,
@@ -233,18 +397,16 @@ export function analyzeTimeline(events) {
     }
 
     // 5. Study Coverage & Program Consistency
-    const studyEvents = sortedEvents.filter(e => e.type === 'STUDIES' && e.start && e.end);
-    const caqEvents = sortedEvents.filter(e => e.type === 'CAQ' && e.start && e.end);
-
     if (studyEvents.length > 0) {
+
         studyEvents.forEach(study => {
-            const studyStart = new Date(study.start);
-            const studyEnd = new Date(study.end);
+            const studyStart = safeParseDate(study.start);
+            const studyEnd = safeParseDate(study.end);
 
             // Find CAQ covering this period
             const coverCAQ = caqEvents.find(caq => {
-                const caqStart = new Date(caq.start);
-                const caqEnd = new Date(caq.end);
+                const caqStart = safeParseDate(caq.start);
+                const caqEnd = safeParseDate(caq.end);
                 return (studyStart >= caqStart && studyEnd <= caqEnd) ||
                     (studyStart <= caqEnd && studyEnd >= caqStart);
             });
@@ -272,74 +434,56 @@ export function analyzeTimeline(events) {
         });
     }
 
-    // 6. Precise Insurance Gap Detection (During CAQ Validity)
-    // Only check if we have presence indicators
-    // Redefine hasPresence as it was used before and might be outdated here
-    const hasPresenceForInsurance = sortedEvents.some(e => ['ENTRY', 'STUDIES', 'WORK_PERMIT'].includes(e.type));
 
-    if (hasPresenceForInsurance && caqEvents.length > 0) {
-        // We want to find days covered by a CAQ but NOT covered by Insurance
-        // This is a simplified "Gap Search"
 
-        caqEvents.forEach(caq => {
-            const cStart = new Date(caq.start);
-            const cEnd = new Date(caq.end);
 
-            // Find insurance events overlapping this CAQ
-            const overlappingIns = insuranceEvents.filter(ins => {
-                const iStart = new Date(ins.start);
-                const iEnd = new Date(ins.end);
-                return (iStart <= cEnd && iEnd >= cStart);
+
+    // 6. Studies & CAQ Consistency (Strict Level + Period Check)
+    if (studyEvents.length > 0) {
+        studyEvents.forEach(study => {
+            const sStart = new Date(study.start);
+            const sEnd = new Date(study.end);
+            if (!isValid(sStart) || !isValid(sEnd)) return;
+
+            // Find overlapping CAQs
+            const coveringCAQs = caqEvents.filter(caq => {
+                const cStart = safeParseDate(caq.start);
+                const cEnd = safeParseDate(caq.end);
+                return (cStart <= sEnd && cEnd >= sStart);
             });
 
-            if (overlappingIns.length === 0) {
-                // Relaxe logic for University level
-                if (caq.level === 'Universitaire') {
-                    report.controls.push({ // Use controls instead of insuranceIssues to lower severity visually if needed, or stick to insuranceIssues but with different message
-                        type: TIMELINE_STATUS.OK, // or WARNING but low impact
-                        message: `Période CAQ du ${caq.start} : Assurance universitaire présumée incluse.`
+            if (coveringCAQs.length > 0) {
+                // Check LEVEL consistency
+                const matchingLevelCAQ = coveringCAQs.find(caq => caq.level === study.level);
+
+                if (!matchingLevelCAQ) {
+                    const coveredLevels = coveringCAQs.map(c => c.level || 'Non spécifié').join(', ');
+                    report.controls.push({
+                        type: TIMELINE_STATUS.ERROR,
+                        message: `Incohérence de programme : Études en "${study.level || 'Non spécifié'}" sous un CAQ pour "${coveredLevels}".`,
+                        date: study.start
                     });
-                    // No penalty or very small
+                    report.score -= 20;
                 } else {
-                    report.insuranceIssues.push({
-                        type: TIMELINE_STATUS.WARNING,
-                        message: `Période CAQ du ${caq.start} au ${caq.end} entièrement sans preuve d'assurance.`
-                    });
-                    report.score -= 15;
-                }
-            } else {
-                // Determine if there are specific gaps
-                // Sort insurance by start date
-                const sortedIns = [...overlappingIns].sort((a, b) => new Date(a.start) - new Date(b.start));
+                    const caqStart = safeParseDate(matchingLevelCAQ.start);
+                    const caqEnd = safeParseDate(matchingLevelCAQ.end);
 
-                let coveredUntil = cStart;
-
-                sortedIns.forEach(ins => {
-                    const iStart = new Date(ins.start);
-                    const iEnd = new Date(ins.end);
-
-                    // If there's a gap between the end of the last covered period and the start of the current insurance
-                    if (iStart > addDays(coveredUntil, 1)) {
-                        // Gap detected
-                        if (caq.level !== 'Universitaire') {
-                            report.insuranceIssues.push({
-                                type: TIMELINE_STATUS.WARNING,
-                                message: `Trou d'assurance du ${formatDate(coveredUntil)} au ${formatDate(addDays(iStart, -1))} pendant le CAQ.`
-                            });
-                            report.score -= 5;
-                        }
+                    if (isBefore(sStart, caqStart) && differenceInDays(caqStart, sStart) > 30) {
+                        report.controls.push({
+                            type: TIMELINE_STATUS.WARNING,
+                            message: `Études (${study.level}) commencées avant le début du CAQ approprié (${formatDate(caqStart)}).`,
+                            date: study.start
+                        });
+                        report.score -= 5;
                     }
-                    // Update coveredUntil to the latest end date of insurance
-                    if (iEnd > coveredUntil) coveredUntil = iEnd;
-                });
-
-                // Check for a gap at the end of the CAQ period
-                if (coveredUntil < cEnd && caq.level !== 'Universitaire') {
-                    report.insuranceIssues.push({
-                        type: TIMELINE_STATUS.WARNING,
-                        message: `Fin de CAQ non couverte par assurance à partir du ${formatDate(addDays(coveredUntil, 1))}.`
-                    });
-                    report.score -= 5;
+                    if (isAfter(sEnd, caqEnd) && differenceInDays(sEnd, caqEnd) > 30) {
+                        report.controls.push({
+                            type: TIMELINE_STATUS.WARNING,
+                            message: `Études (${study.level}) continuées après la fin du CAQ approprié (${formatDate(caqEnd)}).`,
+                            date: study.end
+                        });
+                        report.score -= 5;
+                    }
                 }
             }
         });
@@ -358,8 +502,8 @@ export function analyzeTimeline(events) {
             // For now, strict check: MUST have a permit overlapping
 
             const hasPermit = permitEvents.some(p => {
-                const pStart = new Date(p.start);
-                const pEnd = new Date(p.end);
+                const pStart = safeParseDate(p.start);
+                const pEnd = safeParseDate(p.end);
                 return (sStart >= pStart && sEnd <= pEnd) || (sStart <= pEnd && sEnd >= pStart);
             });
 
@@ -387,7 +531,7 @@ export function analyzeTimeline(events) {
     // Let's assume absence before first Entry.
 
     movementEvents.forEach(move => {
-        const moveDate = new Date(move.submissionDate || move.start);
+        const moveDate = safeParseDate(move.submissionDate || move.start);
         if (!isValid(moveDate)) return;
 
         if (move.type === 'ENTRY') {
@@ -413,15 +557,15 @@ export function analyzeTimeline(events) {
     if (!inCanada && lastMovementDate) {
         // Warning: Currently absent?
         // We might want to flag if they have active studies/CAQ during this open absence
-        const today = new Date();
+        const today = safeParseDate(new Date());
         absencePeriods.push({ start: lastMovementDate, end: today, isOpen: true });
     }
 
     // Validate Studies during Absence
     if (studyEvents.length > 0 && absencePeriods.length > 0) {
         studyEvents.forEach(study => {
-            const sStart = new Date(study.start);
-            const sEnd = new Date(study.end);
+            const sStart = safeParseDate(study.start);
+            const sEnd = safeParseDate(study.end);
             if (!isValid(sStart) || !isValid(sEnd)) return;
 
             absencePeriods.forEach(abs => {
@@ -443,11 +587,11 @@ export function analyzeTimeline(events) {
     // Check if CAQ exists but has huge gaps without studies (e.g. > 150 days)
     if (caqEvents.length > 0 && studyEvents.length > 0) {
         // Sort studies
-        const sortedStudies = [...studyEvents].sort((a, b) => new Date(a.start) - new Date(b.start));
+        const sortedStudies = [...studyEvents].sort((a, b) => safeParseDate(a.start) - safeParseDate(b.start));
 
         for (let i = 0; i < sortedStudies.length - 1; i++) {
-            const currentStudyEnd = new Date(sortedStudies[i].end);
-            const nextStudyStart = new Date(sortedStudies[i + 1].start);
+            const currentStudyEnd = safeParseDate(sortedStudies[i].end);
+            const nextStudyStart = safeParseDate(sortedStudies[i + 1].start);
 
             const gapInDays = differenceInDays(nextStudyStart, currentStudyEnd);
 
@@ -457,7 +601,7 @@ export function analyzeTimeline(events) {
                 const gapMidPoint = addDays(currentStudyEnd, Math.floor(gapInDays / 2));
 
                 const isUnderCAQ = caqEvents.some(caq => {
-                    return isAfter(gapMidPoint, new Date(caq.start)) && isBefore(gapMidPoint, new Date(caq.end));
+                    return isAfter(gapMidPoint, safeParseDate(caq.start)) && isBefore(gapMidPoint, safeParseDate(caq.end));
                 });
 
                 if (isUnderCAQ) {
@@ -469,8 +613,8 @@ export function analyzeTimeline(events) {
 
                     const medicalJustification = sortedEvents.find(e =>
                         e.type === 'MEDICAL' &&
-                        new Date(e.start) <= gapEnd &&
-                        (new Date(e.end) >= gapStart || !e.end)
+                        safeParseDate(e.start) <= gapEnd &&
+                        (safeParseDate(e.end) >= gapStart || !e.end)
                     );
 
                     if (medicalJustification) {
@@ -509,6 +653,20 @@ export function analyzeTimeline(events) {
     else if (report.score >= 80) report.globalStatus = 'Conforme';
     else if (report.score >= 60) report.globalStatus = 'À Risque';
     else report.globalStatus = 'Critique';
+
+    // Combine and sort all alerts chronologically
+    const allAlerts = [
+        ...report.controls,
+        ...report.insuranceIssues,
+        ...report.successionIssues
+    ].sort((a, b) => {
+        const dateA = a.date ? safeParseDate(a.date) : safeParseDate(0);
+        const dateB = b.date ? safeParseDate(b.date) : safeParseDate(0);
+        return dateA - dateB;
+    });
+
+    // Replace individual arrays with sorted combined array
+    report.allAlerts = allAlerts;
 
     return report;
 }
