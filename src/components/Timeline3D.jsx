@@ -7,8 +7,11 @@ import { History, AlertTriangle } from 'lucide-react';
 import { analyzeTimeline } from '../logic/timelineRules';
 
 const safeParseDate = (dateStr) => {
+    if (dateStr === 0) return new Date(0);
     if (!dateStr) return null;
     if (dateStr instanceof Date) return dateStr;
+    if (typeof dateStr === 'number') return new Date(dateStr);
+    // Handle YYYY-MM-DD strings safely as local time
     if (typeof dateStr === 'string' && dateStr.includes('-')) {
         const parts = dateStr.split('-');
         if (parts.length === 3) {
