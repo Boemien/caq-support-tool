@@ -306,6 +306,10 @@ function App() {
                                         Simulateur professionnel pour évaluer la conformité d'un dossier avant soumission au MIFI.
                                     </p>
                                 </div>
+                                <div className="footer-disclaimer">
+                                    <AlertTriangle size={14} />
+                                    <p><strong>Aide à la constitution de dossier :</strong> Cet outil est une simulation basée sur les règles publiques. Il ne remplace pas les conseils d'un professionnel agréé, ni les décisions officielles du gouvernement du Québec en matière de délivrance de CAQ et n'a aucune valeur juridique officielle.</p>
+                                </div>
                             </div>
                         </div>
                         <div className="form-column">
@@ -881,6 +885,10 @@ function App() {
                                         Outil de chronologie interactive pour visualiser l'historique des statuts et d&eacute;tecter les ruptures de conformit&eacute;.
                                     </p>
                                 </div>
+                                <div className="footer-disclaimer">
+                                    <AlertTriangle size={14} />
+                                    <p><strong>Aide à la constitution de dossier :</strong> Cet outil est une simulation basée sur les règles publiques. Il ne remplace pas les conseils d'un professionnel agréé, ni les décisions officielles du gouvernement du Québec en matière de délivrance de CAQ et n'a aucune valeur juridique officielle.</p>
+                                </div>
                             </div>
                         </div>
                         <div className="chronology-layout">
@@ -1233,9 +1241,11 @@ function App() {
                         <div className="source-links">
                             <a href="https://www.legisquebec.gouv.qc.ca/fr/document/lc/i-0.2.1" target="_blank" rel="noopener noreferrer">LIQ (Loi sur l'immigration au Québec)</a>
                             <a href="https://www.legisquebec.gouv.qc.ca/fr/document/rc/I-0.2.1,%20r.%203" target="_blank" rel="noopener noreferrer">RIQ (Règlement sur l'immigration au Québec)</a>
-                            <a href="https://www.quebec.ca/education/etudier-quebec/demande-selection-temporaire/capacite-financiere-documents-exiges" target="_blank" rel="noopener noreferrer">Capacité financière (Règle Territoires)</a>
+                            <a href="https://www.quebec.ca/education/etudier-quebec/demande-selection-temporaire" target="_blank" rel="noopener noreferrer">Capacité financière (Règle Territoires)</a>
                             <a href="https://www.quebec.ca/education/etudier-quebec" target="_blank" rel="noopener noreferrer">Étudier au Québec (Quebec.ca)</a>
                             <a href="https://www.quebec.ca/education/etudier-quebec/documents" target="_blank" rel="noopener noreferrer">Documents requis (Quebec.ca)</a>
+                            <a href="https://www.quebec.ca/education/etudier-quebec/conditions-requises" target="_blank" rel="noopener noreferrer">Conditions requises (Quebec.ca)</a>
+                            <a href="https://www.quebec.ca/education/etudier-quebec/conditions-requises/cout-etudes" target="_blank" rel="noopener noreferrer">Coût du séjour d’études au Québec</a>
                         </div>
                     </div>
                     <div className="footer-disclaimer">
